@@ -1,4 +1,7 @@
 #!/bin/bash
+# cari apa..?? harta tahta hanya sementara ingat masih ada kehidupan setelah kematian
+# jangan lupa sholat ingat ajal menantimu
+# dibawah ini bukan cd kaset ya
 cd
 rm -rf setup.sh
 clear
@@ -16,57 +19,102 @@ tyblue() { echo -e "\\033[36;1m${*}\\033[0m"; }
 yellow() { echo -e "\\033[33;1m${*}\\033[0m"; }
 green() { echo -e "\\033[32;1m${*}\\033[0m"; }
 red() { echo -e "\\033[31;1m${*}\\033[0m"; }
-
 cd /root
-
+#System version number
 if [ "${EUID}" -ne 0 ]; then
-  echo "You need to run this script as root"
-  sleep 5
-  exit 1
+    echo "You need to run this script as root"
+    sleep 5
+    exit 1
 fi
-
 if [ "$(systemd-detect-virt)" == "openvz" ]; then
-  echo "OpenVZ is not supported"
-  sleep 5
-  exit 1
+    echo "OpenVZ is not supported"
+    clear
+    echo "For VPS with KVM and VMWare virtualization ONLY"
+    sleep 5
+    exit 1
 fi
 
 localip=$(hostname -I | cut -d\  -f1)
 hst=( `hostname` )
 dart=$(cat /etc/hosts | grep -w `hostname` | awk '{print $2}')
 if [[ "$hst" != "$dart" ]]; then
-  echo "$localip $(hostname)" >> /etc/hosts
+    echo "$localip $(hostname)" >> /etc/hosts
 fi
 
-mkdir -p /etc/xray /etc/v2ray
-touch /etc/xray/domain /etc/v2ray/domain /etc/xray/scdomain /etc/v2ray/scdomain
+# buat folder
+mkdir -p /etc/xray
+mkdir -p /etc/v2ray
+touch /etc/xray/domain
+touch /etc/v2ray/domain
+touch /etc/xray/scdomain
+touch /etc/v2ray/scdomain
 
-echo -e "[ ${BBlue}NOTES${NC} ] Checking headers..."
+echo -e "[ ${BBlue}NOTES${NC} ] Before we go.. "
 sleep 0.5
-totet=$(uname -r)
+echo -e "[ ${BBlue}NOTES${NC} ] I need check your headers first.."
+sleep 0.5
+echo -e "[ ${BGreen}INFO${NC} ] Checking headers"
+sleep 0.5
+totet=`uname -r`
 REQUIRED_PKG="linux-headers-$totet"
-PKG_OK=$(dpkg-query -W --showformat='${Status}\n' $REQUIRED_PKG | grep "install ok installed")
+PKG_OK=$(dpkg-query -W --showformat='${Status}\n' $REQUIRED_PKG|grep "install ok installed")
+echo Checking for $REQUIRED_PKG: $PKG_OK
 if [ "" = "$PKG_OK" ]; then
-  echo -e "[ ${BRed}WARNING${NC} ] Linux headers missing, continuing anyway..."
-  # skip exit
+    sleep 0.5
+    echo -e "[ ${BRed}WARNING${NC} ] Try to install ...."
+    echo "No $REQUIRED_PKG. Setting up $REQUIRED_PKG."
+    apt-get --yes install $REQUIRED_PKG
+    sleep 0.5
+    echo ""
+    sleep 0.5
+    echo -e "[ ${BBlue}NOTES${NC} ] If error you need.. to do this"
+    sleep 0.5
+    echo ""
+    sleep 0.5
+    echo -e "[ ${BBlue}NOTES${NC} ] apt update && apt upgrade -y && reboot"
+    sleep 0.5
+    echo ""
+    sleep 0.5
+    echo -e "[ ${BBlue}NOTES${NC} ] After this"
+    sleep 0.5
+    echo -e "[ ${BBlue}NOTES${NC} ] Then run this script again"
+    echo -e "[ ${BBlue}NOTES${NC} ] enter now"
+    read
 else
-  echo -e "[ ${BGreen}INFO${NC} ] Linux headers installed."
+    echo -e "[ ${BGreen}INFO${NC} ] Oke installed"
+fi
+
+ttet=`uname -r`
+ReqPKG="linux-headers-$ttet"
+if ! dpkg -s $ReqPKG >/dev/null 2>&1; then
+    rm /root/setup.sh >/dev/null 2>&1
+    exit
+else
+    clear
 fi
 
 secs_to_human() {
-  echo "Installation time : $(( ${1} / 3600 )) hours $(( (${1} / 60) % 60 )) minute's $(( ${1} % 60 )) seconds"
+    echo "Installation time : $(( ${1} / 3600 )) hours $(( (${1} / 60) % 60 )) minute's $(( ${1} % 60 )) seconds"
 }
 start=$(date +%s)
-
 ln -fs /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
 sysctl -w net.ipv6.conf.all.disable_ipv6=1 >/dev/null 2>&1
 sysctl -w net.ipv6.conf.default.disable_ipv6=1 >/dev/null 2>&1
 
-apt install git curl python -y >/dev/null 2>&1
+echo -e "[ ${BGreen}INFO${NC} ] Preparing the install file"
+apt install git curl -y >/dev/null 2>&1
+apt install python -y >/dev/null 2>&1
+echo -e "[ ${BGreen}INFO${NC} ] Aight good ... installation file is ready"
+sleep 0.5
+echo -ne "[ ${BGreen}INFO${NC} ] Check permission : "
+echo -e "$BGreen Permission Accepted!$NC"
+sleep 2
 
-mkdir -p /var/lib/
+mkdir -p /var/lib/ >/dev/null 2>&1
 echo "IP=" >> /var/lib/ipvps.conf
 
+echo ""
+clear
 echo -e "$BBlue                     SETUP DOMAIN VPS     $NC"
 echo -e "$BYellow----------------------------------------------------------$NC"
 echo -e "$BGreen 1. Use Domain Random / Gunakan Domain Random $NC"
@@ -74,65 +122,129 @@ echo -e "$BGreen 2. Choose Your Own Domain / Gunakan Domain Sendiri $NC"
 echo -e "$BYellow----------------------------------------------------------$NC"
 read -rp " input 1 or 2 / pilih 1 atau 2 : " dns
 
-if [[ "$dns" == "1" ]]; then
-    echo -e "[${BGreen}INFO${NC}] Using Random Domain..."
-    if [ -f /root/scripts/cf ]; then
-        /bin/bash /root/scripts/cf
-    else
-        echo -e "[${BRed}WARNING${NC}] /root/scripts/cf not found, skipping..."
+if test $dns -eq 1; then
+    # Ensure cf script exists, download if missing
+    if [ ! -f "/root/scripts/cf" ]; then
+        mkdir -p /root/scripts
+        wget -O /root/scripts/cf https://raw.githubusercontent.com/givpn/AutoScriptXray/master/ssh/cf
+        chmod +x /root/scripts/cf
     fi
-elif [[ "$dns" == "2" ]]; then
+    /root/scripts/cf || { echo -e "[${BRed}ERROR${NC}] Cloudflare script failed, exiting"; exit 1; }
+elif test $dns -eq 2; then
     read -rp "Enter Your Domain / masukan domain : " dom
-    echo -e "[${BGreen}INFO${NC}] Using Custom Domain: $dom"
-    mkdir -p /root/xray /etc/xray /etc/v2ray
-    echo "$dom" | tee /root/domain /etc/xray/domain /etc/v2ray/domain /root/scdomain /root/xray/scdomain > /dev/null
+    echo "IP=$dom" > /var/lib/ipvps.conf
+    echo "$dom" > /root/scdomain
+    echo "$dom" > /etc/xray/scdomain
+    echo "$dom" > /etc/xray/domain
+    echo "$dom" > /etc/v2ray/domain
+    echo "$dom" > /root/domain
 else 
-    echo -e "[${BRed}ERROR${NC}] Invalid selection, continuing..."
+    echo -e "[${BRed}ERROR${NC}] Invalid selection"
+    exit 1
 fi
 
-sleep 1
+echo -e "${BGreen}Done!${NC}"
+sleep 2
+clear
 
-# Install SSH Websocket
+#install ssh ovpn
+echo -e "\e[33m-----------------------------------\033[0m"
 echo -e "$BGreen      Install SSH Websocket           $NC"
-wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/ssh-vpn.sh -O ssh-vpn.sh
-if [ -f ssh-vpn.sh ]; then
-    chmod +x ssh-vpn.sh
-    ./ssh-vpn.sh
-else
-    echo -e "[${BRed}ERROR${NC}] ssh-vpn.sh download failed, continuing..."
-fi
+echo -e "\e[33m-----------------------------------\033[0m"
+sleep 0.5
+clear
+wget https://raw.githubusercontent.com/givpn/AutoScriptXray/master/ssh/ssh-vpn.sh && chmod +x ssh-vpn.sh && ./ssh-vpn.sh
 
-# Install Xray
+#Install Xray
+echo -e "\e[33m-----------------------------------\033[0m"
 echo -e "$BGreen          Install XRAY              $NC"
-wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/xray/ins-xray.sh -O ins-xray.sh
-if [ -f ins-xray.sh ]; then
-    chmod +x ins-xray.sh
-    ./ins-xray.sh
-else
-    echo -e "[${BRed}ERROR${NC}] ins-xray.sh download failed, continuing..."
-fi
+echo -e "\e[33m-----------------------------------\033[0m"
+sleep 0.5
+clear
+wget https://raw.githubusercontent.com/givpn/AutoScriptXray/master/xray/ins-xray.sh && chmod +x ins-xray.sh && ./ins-xray.sh
+wget https://raw.githubusercontent.com/givpn/AutoScriptXray/master/sshws/insshws.sh && chmod +x insshws.sh && ./insshws.sh
+clear
 
-wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/sshws/insshws.sh -O insshws.sh
-if [ -f insshws.sh ]; then
-    chmod +x insshws.sh
-    ./insshws.sh
-else
-    echo -e "[${BRed}ERROR${NC}] insshws.sh download failed, continuing..."
-fi
-
-# Setup profile
 cat> /root/.profile << END
-if [ "\$BASH" ]; then
+# ~/.profile: executed by Bourne-compatible login shells.
+
+if [ "$BASH" ]; then
   if [ -f ~/.bashrc ]; then
     . ~/.bashrc
   fi
 fi
+
 mesg n || true
 clear
 menu
 END
 chmod 644 /root/.profile
 
-echo -e "[${BGreen}INFO${NC}] Installation complete. Rebooting in 10 seconds..."
-sleep 10
-reboot
+if [ -f "/root/log-install.txt" ]; then
+    rm /root/log-install.txt > /dev/null 2>&1
+fi
+if [ -f "/etc/afak.conf" ]; then
+    rm /etc/afak.conf > /dev/null 2>&1
+fi
+if [ ! -f "/etc/log-create-ssh.log" ]; then
+    echo "Log SSH Account " > /etc/log-create-ssh.log
+fi
+if [ ! -f "/etc/log-create-vmess.log" ]; then
+    echo "Log Vmess Account " > /etc/log-create-vmess.log
+fi
+if [ ! -f "/etc/log-create-vless.log" ]; then
+    echo "Log Vless Account " > /etc/log-create-vless.log
+fi
+if [ ! -f "/etc/log-create-trojan.log" ]; then
+    echo "Log Trojan Account " > /etc/log-create-trojan.log
+fi
+if [ ! -f "/etc/log-create-shadowsocks.log" ]; then
+    echo "Log Shadowsocks Account " > /etc/log-create-shadowsocks.log
+fi
+history -c
+serverV=$( curl -sS https://raw.githubusercontent.com/givpn/AutoScriptXray/master/menu/versi  )
+echo $serverV > /opt/.ver
+aureb=$(cat /home/re_otm)
+b=11
+if [ $aureb -gt $b ]
+then
+gg="PM"
+else
+gg="AM"
+fi
+curl -sS ipv4.icanhazip.com > /etc/myipvps
+echo ""
+echo "=================================================================="  | tee -a log-install.txt
+echo "      ___                                    ___         ___      "  | tee -a log-install.txt
+echo "     /  /\        ___           ___         /  /\       /__/\     "  | tee -a log-install.txt
+echo "    /  /:/_      /  /\         /__/\       /  /::\      \  \:\    "  | tee -a log-install.txt
+echo "   /  /:/ /\    /  /:/         \  \:\     /  /:/\:\      \  \:\   "  | tee -a log-install.txt
+echo "  /  /:/_/::\  /__/::\          \  \:\   /  /:/~/:/  _____\__\:\  "  | tee -a log-install.txt
+echo " /__/:/__\/\:\ \__\/\:\__   ___  \__\:\ /__/:/ /:/  /__/::::::::\ "  | tee -a log-install.txt
+echo " \  \:\ /~~/:/    \  \:\/\ /__/\ |  |:| \  \:\/:/   \  \:\~~\~~\/ "  | tee -a log-install.txt
+echo "  \  \:\  /:/      \__\::/ \  \:\|  |:|  \  \::/     \  \:\  ~~~  "  | tee -a log-install.txt
+echo "   \  \:\/:/       /__/:/   \  \:\__|:|   \  \:\      \  \:\      "  | tee -a log-install.txt
+echo "    \  \::/        \__\/     \__\::::/     \  \:\      \  \:\     "  | tee -a log-install.txt
+echo "     \__\/                       ~~~~       \__\/       \__\/ 1.0 "  | tee -a log-install.txt
+echo "=================================================================="  | tee -a log-install.txt
+echo ""
+echo "   >>> Service & Port"  | tee -a log-install.txt
+echo "   - OpenSSH                  : 22"  | tee -a log-install.txt
+echo "   - SSH Websocket            : 80" | tee -a log-install.txt
+echo "   - SSH SSL Websocket        : 443" | tee -a log-install.txt
+echo "   - Stunnel4                 : 222, 777" | tee -a log-install.txt
+echo "   - Dropbear                 : 109, 143" | tee -a log-install.txt
+echo "   - Badvpn                   : 7100-7900" | tee -a log-install.txt
+echo "   - Nginx                    : 81" | tee -a log-install.txt
+echo "   - Vmess WS TLS             : 443" | tee -a log-install.txt
+echo "   - Vless WS TLS             : 443" | tee -a log-install.txt
+echo "   - Trojan WS TLS            : 443" | tee -a log-install.txt
+echo "   - Shadowsocks WS TLS       : 443" | tee -a log-install.txt
+echo "   - Vmess WS none TLS        : 80" | tee -a log-install.txt
+echo "   - Vless WS none TLS        : 80" | tee -a log-install.txt
+echo "   - Trojan WS none TLS       : 80" | tee -a log-install.txt
+echo "   - Shadowsocks WS none TLS  : 80" | tee -a log-install.txt
+echo "   - Vmess gRPC               : 443" | tee -a log-install.txt
+echo "   - Vless gRPC               : 443" | tee -a log-install.txt
+echo "   - Trojan gRPC              : 443" | tee -a log-install.txt
+echo "   - Shadowsocks gRPC         : 443" | tee -
