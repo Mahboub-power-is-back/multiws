@@ -121,31 +121,24 @@ echo -e "$BGreen 1. Use Domain Random / Gunakan Domain Random $NC"
 echo -e "$BGreen 2. Choose Your Own Domain / Gunakan Domain Sendiri $NC"
 echo -e "$BYellow----------------------------------------------------------$NC"
 
-# Check if running interactively
+dns_choice=""
+# Use read only if interactive shell
 if [ -t 0 ]; then
-    read -rp " input 1 or 2 / pilih 1 atau 2 : " dns
-else
-    dns=1  # default to random domain if non-interactive
+    read -rp " input 1 or 2 / pilih 1 atau 2 : " dns_choice
 fi
 
-if test "$dns" -eq 1; then
-    echo -e "[ ${BGreen}INFO${NC} ] Using Random Domain..."
-    /bin/bash /root/scripts/cf   # Your CF domain script
-elif test "$dns" -eq 2; then
+if [[ "$dns_choice" == "2" ]]; then
     read -rp "Enter Your Domain / masukan domain : " dom
     echo -e "[ ${BGreen}INFO${NC} ] Using Custom Domain: $dom"
     mkdir -p /root/xray /etc/xray /etc/v2ray
-    # Write domain to all necessary locations
     echo "$dom" | tee /root/domain /etc/xray/domain /etc/v2ray/domain /root/scdomain /root/xray/scdomain > /dev/null
 else
-    echo -e "${BRed}Not Found Argument. Defaulting to Random Domain${NC}"
-    /bin/bash /root/scripts/cf
+    echo -e "[ ${BGreen}INFO${NC} ] Using Random Domain..."
+    bash /root/scripts/cf || { echo "[${BRed}ERROR${NC}] Cloudflare script failed"; exit 1; }
 fi
 
-# Continue script installation without exit
 echo -e "[ ${BGreen}INFO${NC} ] Domain setup complete, continuing installation..."
 sleep 1
-fi
 echo -e "${BGreen}Done!${NC}"
 sleep 2
 clear
