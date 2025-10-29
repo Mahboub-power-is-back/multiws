@@ -1,51 +1,46 @@
 #!/bin/bash
-#random
-apt install -y jq curl > /dev/null 2>&1
-rm -rf /root/xray/scdomain
-mkdir -p /root/xray
-clear
+# Install dependencies
+apt update -y && apt install -y jq curl
 
+# Random subdomain
 sub=$(</dev/urandom tr -dc a-z0-9 | head -c5)
-DOMAIN=mahboubvps.site
-SUB_DOMAIN=asx-${sub}.${DOMAIN}
+DOMAIN="mahboubvps.site"
+SUB_DOMAIN="asx-${sub}.${DOMAIN}"
 CF_TOKEN="XOYA63kolRF-6_EzxZQ22ESucCdm7zSJl7NEDQtA"
-
 IP=$(curl -s ipv4.icanhazip.com)
 
-echo -e "\n[*] Creating DNS Record for: $SUB_DOMAIN\n"
+echo "[*] Your server IP: $IP"
+echo "[*] Subdomain to create: $SUB_DOMAIN"
 
-# Get Zone ID
-ZONE=$(curl -sLX GET "https://api.cloudflare.com/client/v4/zones?name=${DOMAIN}&status=active" \
-     -H "Authorization: Bearer ${CF_TOKEN}" \
-     -H "Content-Type: application/json" | jq -r '.result[0].id')
+# Zone ID
+ZONE="8761c8222fe8a4d1249e8563eedf43ee"
+echo "[*] Using Zone ID: $ZONE"
 
-if [[ -z "$ZONE" || "$ZONE" == "null" ]]; then
-   echo "❌ ERROR: Domain $DOMAIN not found in Cloudflare account!"
-   exit 1
-fi
+# Check if record exists
+RECORD_ID=$(curl -sLX GET "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records?name=${SUB_DOMAIN}" \
+  -H "Authorization: Bearer ${CF_TOKEN}" \
+  -H "Content-Type: application/json" | jq -r '.result[0].id')
 
-# Check existing record
-RECORD=$(curl -sLX GET "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records?name=${SUB_DOMAIN}" \
-     -H "Authorization: Bearer ${CF_TOKEN}" \
-     -H "Content-Type: application/json" | jq -r '.result[0].id')
-
-# Create if not exists
-if [[ -z "$RECORD" || "$RECORD" == "null" ]]; then
-   RECORD=$(curl -sLX POST "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records" \
+if [[ -z "$RECORD_ID" || "$RECORD_ID" == "null" ]]; then
+  echo "[*] Record does not exist, creating..."
+  CREATE=$(curl -sLX POST "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records" \
      -H "Authorization: Bearer ${CF_TOKEN}" \
      -H "Content-Type: application/json" \
-     --data "{\"type\":\"A\",\"name\":\"${SUB_DOMAIN}\",\"content\":\"${IP}\",\"ttl\":1,\"proxied\":false}" | jq -r '.result.id')
-fi
-
-# Update record
-curl -sLX PUT "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records/${RECORD}" \
+     --data "{\"type\":\"A\",\"name\":\"${SUB_DOMAIN}\",\"content\":\"${IP}\",\"ttl\":120,\"proxied\":false}")
+  echo "$CREATE" | jq
+  RECORD_ID=$(echo "$CREATE" | jq -r '.result.id')
+else
+  echo "[*] Record exists, updating..."
+  UPDATE=$(curl -sLX PUT "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records/${RECORD_ID}" \
      -H "Authorization: Bearer ${CF_TOKEN}" \
      -H "Content-Type: application/json" \
-     --data "{\"type\":\"A\",\"name\":\"${SUB_DOMAIN}\",\"content\":\"${IP}\",\"ttl\":1,\"proxied\":false}" >/dev/null
+     --data "{\"type\":\"A\",\"name\":\"${SUB_DOMAIN}\",\"content\":\"${IP}\",\"ttl\":120,\"proxied\":false}")
+  echo "$UPDATE" | jq
+fi
 
-# Save domain info
+# Save to files
 mkdir -p /etc/xray /etc/v2ray /root/xray
 echo "$SUB_DOMAIN" | tee /root/domain /etc/xray/domain /etc/v2ray/domain /root/scdomain /root/xray/scdomain > /dev/null
 echo "IP=$SUB_DOMAIN" > /var/lib/ipvps.conf
 
-echo -e "\n✅ DOMAIN SUCCESSFULLY GENERATED: $SUB_DOMAIN\n"
+echo "✅ Subdomain created: $SUB_DOMAIN"
