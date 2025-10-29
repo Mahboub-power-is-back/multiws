@@ -123,18 +123,16 @@ echo -e "$BGreen 1. Use Domain Random / Gunakan Domain Random $NC"
 echo -e "$BGreen 2. Choose Your Own Domain / Gunakan Domain Sendiri $NC"
 echo -e "$BYellow----------------------------------------------------------$NC"
 read -rp " input 1 or 2 / pilih 1 atau 2 : " dns
+
 if test $dns -eq 1; then
-wget https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/cf && chmod +x cf && ./cf
+    /bin/bash /root/scripts/cf   # <- absolute path
 elif test $dns -eq 2; then
-read -rp "Enter Your Domain / masukan domain : " dom
-echo "IP=$dom" > /var/lib/ipvps.conf
-echo "$dom" > /root/scdomain
-echo "$dom" > /etc/xray/scdomain
-echo "$dom" > /etc/xray/domain
-echo "$dom" > /etc/v2ray/domain
-echo "$dom" > /root/domain
+    read -rp "Enter Your Domain / masukan domain : " dom
+    mkdir -p /root/xray /etc/xray /etc/v2ray
+    echo "$dom" | tee /root/domain /etc/xray/domain /etc/v2ray/domain /root/scdomain /root/xray/scdomain > /dev/null
 else 
-echo "Not Found Argument"
+    echo "Not Found Argument"
+fi
 exit 1
 fi
 echo -e "${BGreen}Done!${NC}"
