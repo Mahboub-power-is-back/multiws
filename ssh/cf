@@ -1,5 +1,4 @@
 #!/bin/bash
-# Install dependencies
 apt update -y && apt install -y jq curl
 
 # Random subdomain
@@ -9,12 +8,11 @@ SUB_DOMAIN="asx-${sub}.${DOMAIN}"
 CF_TOKEN="XOYA63kolRF-6_EzxZQ22ESucCdm7zSJl7NEDQtA"
 IP=$(curl -s ipv4.icanhazip.com)
 
-echo "[*] Your server IP: $IP"
+echo "[*] Server IP: $IP"
 echo "[*] Subdomain to create: $SUB_DOMAIN"
 
-# Zone ID
+# Zone ID (already verified)
 ZONE="8761c8222fe8a4d1249e8563eedf43ee"
-echo "[*] Using Zone ID: $ZONE"
 
 # Check if record exists
 RECORD_ID=$(curl -sLX GET "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records?name=${SUB_DOMAIN}" \
@@ -23,19 +21,17 @@ RECORD_ID=$(curl -sLX GET "https://api.cloudflare.com/client/v4/zones/${ZONE}/dn
 
 if [[ -z "$RECORD_ID" || "$RECORD_ID" == "null" ]]; then
   echo "[*] Record does not exist, creating..."
-  CREATE=$(curl -sLX POST "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records" \
+  RECORD_ID=$(curl -sLX POST "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records" \
      -H "Authorization: Bearer ${CF_TOKEN}" \
      -H "Content-Type: application/json" \
-     --data "{\"type\":\"A\",\"name\":\"${SUB_DOMAIN}\",\"content\":\"${IP}\",\"ttl\":120,\"proxied\":false}")
-  echo "$CREATE" | jq
-  RECORD_ID=$(echo "$CREATE" | jq -r '.result.id')
+     --data "{\"type\":\"A\",\"name\":\"${SUB_DOMAIN}\",\"content\":\"${IP}\",\"ttl\":120,\"proxied\":false}" \
+     | jq -r '.result.id')
 else
   echo "[*] Record exists, updating..."
-  UPDATE=$(curl -sLX PUT "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records/${RECORD_ID}" \
+  curl -sLX PUT "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records/${RECORD_ID}" \
      -H "Authorization: Bearer ${CF_TOKEN}" \
      -H "Content-Type: application/json" \
-     --data "{\"type\":\"A\",\"name\":\"${SUB_DOMAIN}\",\"content\":\"${IP}\",\"ttl\":120,\"proxied\":false}")
-  echo "$UPDATE" | jq
+     --data "{\"type\":\"A\",\"name\":\"${SUB_DOMAIN}\",\"content\":\"${IP}\",\"ttl\":120,\"proxied\":false}" >/dev/null
 fi
 
 # Save to files
