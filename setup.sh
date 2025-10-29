@@ -20,6 +20,7 @@ yellow() { echo -e "\\033[33;1m${*}\\033[0m"; }
 green() { echo -e "\\033[32;1m${*}\\033[0m"; }
 red() { echo -e "\\033[31;1m${*}\\033[0m"; }
 cd /root
+
 #System version number
 if [ "${EUID}" -ne 0 ]; then
     echo "You need to run this script as root"
@@ -102,8 +103,7 @@ sysctl -w net.ipv6.conf.all.disable_ipv6=1 >/dev/null 2>&1
 sysctl -w net.ipv6.conf.default.disable_ipv6=1 >/dev/null 2>&1
 
 echo -e "[ ${BGreen}INFO${NC} ] Preparing the install file"
-apt install git curl -y >/dev/null 2>&1
-apt install python -y >/dev/null 2>&1
+apt install git curl python -y >/dev/null 2>&1
 echo -e "[ ${BGreen}INFO${NC} ] Aight good ... installation file is ready"
 sleep 0.5
 echo -ne "[ ${BGreen}INFO${NC} ] Check permission : "
@@ -123,15 +123,22 @@ echo -e "$BYellow----------------------------------------------------------$NC"
 read -rp " input 1 or 2 / pilih 1 atau 2 : " dns
 
 if test $dns -eq 1; then
-    # Ensure cf script exists, download if missing
-    if [ ! -f "/root/scripts/cf" ]; then
-        mkdir -p /root/scripts
-        apt install -y curl jq
-        wget -O /root/scripts/cf https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/refs/heads/master/ssh/cf
-        chmod +x /root/scripts/cf
-        bash cf
+    # Ensure dependencies
+    apt update
+    apt install -y curl jq dos2unix
+
+    # Ensure cf script exists
+    mkdir -p /root/scripts
+    wget -O /root/scripts/cf https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/refs/heads/master/ssh/cf
+    dos2unix /root/scripts/cf
+    chmod +x /root/scripts/cf
+
+    # Run cf script safely
+    bash /root/scripts/cf
+    if [ $? -ne 0 ]; then
+        echo -e "[${BRed}ERROR${NC}] Cloudflare script failed, exiting"
+        exit 1
     fi
-    /root/scripts/cf || { echo -e "[${BRed}ERROR${NC}] Cloudflare script failed, exiting"; exit 1; }
 elif test $dns -eq 2; then
     read -rp "Enter Your Domain / masukan domain : " dom
     echo "IP=$dom" > /var/lib/ipvps.conf
@@ -167,10 +174,11 @@ wget https://raw.githubusercontent.com/givpn/AutoScriptXray/master/xray/ins-xray
 wget https://raw.githubusercontent.com/givpn/AutoScriptXray/master/sshws/insshws.sh && chmod +x insshws.sh && ./insshws.sh
 clear
 
+# Setup .profile to launch menu
 cat> /root/.profile << END
 # ~/.profile: executed by Bourne-compatible login shells.
 
-if [ "$BASH" ]; then
+if [ "\$BASH" ]; then
   if [ -f ~/.bashrc ]; then
     . ~/.bashrc
   fi
@@ -182,71 +190,19 @@ menu
 END
 chmod 644 /root/.profile
 
-if [ -f "/root/log-install.txt" ]; then
-    rm /root/log-install.txt > /dev/null 2>&1
-fi
-if [ -f "/etc/afak.conf" ]; then
-    rm /etc/afak.conf > /dev/null 2>&1
-fi
-if [ ! -f "/etc/log-create-ssh.log" ]; then
-    echo "Log SSH Account " > /etc/log-create-ssh.log
-fi
-if [ ! -f "/etc/log-create-vmess.log" ]; then
-    echo "Log Vmess Account " > /etc/log-create-vmess.log
-fi
-if [ ! -f "/etc/log-create-vless.log" ]; then
-    echo "Log Vless Account " > /etc/log-create-vless.log
-fi
-if [ ! -f "/etc/log-create-trojan.log" ]; then
-    echo "Log Trojan Account " > /etc/log-create-trojan.log
-fi
-if [ ! -f "/etc/log-create-shadowsocks.log" ]; then
-    echo "Log Shadowsocks Account " > /etc/log-create-shadowsocks.log
-fi
+# Logs
+for log in ssh vmess vless trojan shadowsocks; do
+    if [ ! -f "/etc/log-create-$log.log" ]; then
+        echo "Log $log Account " > /etc/log-create-$log.log
+    fi
+done
+
 history -c
-serverV=$( curl -sS https://raw.githubusercontent.com/givpn/AutoScriptXray/master/menu/versi  )
-echo $serverV > /opt/.ver
-aureb=$(cat /home/re_otm)
-b=11
-if [ $aureb -gt $b ]
-then
-gg="PM"
-else
-gg="AM"
-fi
-curl -sS ipv4.icanhazip.com > /etc/myipvps
-echo ""
-echo "=================================================================="  | tee -a log-install.txt
-echo "      ___                                    ___         ___      "  | tee -a log-install.txt
-echo "     /  /\        ___           ___         /  /\       /__/\     "  | tee -a log-install.txt
-echo "    /  /:/_      /  /\         /__/\       /  /::\      \  \:\    "  | tee -a log-install.txt
-echo "   /  /:/ /\    /  /:/         \  \:\     /  /:/\:\      \  \:\   "  | tee -a log-install.txt
-echo "  /  /:/_/::\  /__/::\          \  \:\   /  /:/~/:/  _____\__\:\  "  | tee -a log-install.txt
-echo " /__/:/__\/\:\ \__\/\:\__   ___  \__\:\ /__/:/ /:/  /__/::::::::\ "  | tee -a log-install.txt
-echo " \  \:\ /~~/:/    \  \:\/\ /__/\ |  |:| \  \:\/:/   \  \:\~~\~~\/ "  | tee -a log-install.txt
-echo "  \  \:\  /:/      \__\::/ \  \:\|  |:|  \  \::/     \  \:\  ~~~  "  | tee -a log-install.txt
-echo "   \  \:\/:/       /__/:/   \  \:\__|:|   \  \:\      \  \:\      "  | tee -a log-install.txt
-echo "    \  \::/        \__\/     \__\::::/     \  \:\      \  \:\     "  | tee -a log-install.txt
-echo "     \__\/                       ~~~~       \__\/       \__\/ 1.0 "  | tee -a log-install.txt
-echo "=================================================================="  | tee -a log-install.txt
-echo ""
-echo "   >>> Service & Port"  | tee -a log-install.txt
-echo "   - OpenSSH                  : 22"  | tee -a log-install.txt
-echo "   - SSH Websocket            : 80" | tee -a log-install.txt
-echo "   - SSH SSL Websocket        : 443" | tee -a log-install.txt
-echo "   - Stunnel4                 : 222, 777" | tee -a log-install.txt
-echo "   - Dropbear                 : 109, 143" | tee -a log-install.txt
-echo "   - Badvpn                   : 7100-7900" | tee -a log-install.txt
-echo "   - Nginx                    : 81" | tee -a log-install.txt
-echo "   - Vmess WS TLS             : 443" | tee -a log-install.txt
-echo "   - Vless WS TLS             : 443" | tee -a log-install.txt
-echo "   - Trojan WS TLS            : 443" | tee -a log-install.txt
-echo "   - Shadowsocks WS TLS       : 443" | tee -a log-install.txt
-echo "   - Vmess WS none TLS        : 80" | tee -a log-install.txt
-echo "   - Vless WS none TLS        : 80" | tee -a log-install.txt
-echo "   - Trojan WS none TLS       : 80" | tee -a log-install.txt
-echo "   - Shadowsocks WS none TLS  : 80" | tee -a log-install.txt
-echo "   - Vmess gRPC               : 443" | tee -a log-install.txt
-echo "   - Vless gRPC               : 443" | tee -a log-install.txt
-echo "   - Trojan gRPC              : 443" | tee -a log-install.txt
-echo "   - Shadowsocks gRPC         : 443" | tee -
+
+# Install finished
+echo -e "${BGreen}Installation Finished!${NC}"
+secs_to_human "$(($(date +%s) - ${start}))" | tee -a /root/log-install.txt
+echo -e "Auto reboot in 10 seconds..."
+sleep 10
+rm -rf setup.sh
+reboot
