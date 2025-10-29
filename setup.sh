@@ -116,32 +116,28 @@ mkdir -p /var/lib/ >/dev/null 2>&1
 echo "IP=" >> /var/lib/ipvps.conf
 
 echo -e "$BBlue                     SETUP DOMAIN VPS     $NC"
+echo -e "$BBlue                     SETUP DOMAIN VPS     $NC"
 echo -e "$BYellow----------------------------------------------------------$NC"
 echo -e "$BGreen 1. Use Domain Random / Gunakan Domain Random $NC"
 echo -e "$BGreen 2. Choose Your Own Domain / Gunakan Domain Sendiri $NC"
 echo -e "$BYellow----------------------------------------------------------$NC"
 
-dns_choice=""
-# Use read only if interactive shell
-if [ -t 0 ]; then
-    read -rp " input 1 or 2 / pilih 1 atau 2 : " dns_choice
-fi
+read -rp " input 1 or 2 / pilih 1 atau 2 : " dns
 
-if [[ "$dns_choice" == "2" ]]; then
+if [[ "$dns" == "1" ]]; then
+    echo -e "[${BGreen}INFO${NC}] Using Random Domain..."
+    /bin/bash /root/scripts/cf || { echo -e "[${BRed}ERROR${NC}] Cloudflare script failed, exiting"; exit 1; }
+elif [[ "$dns" == "2" ]]; then
     read -rp "Enter Your Domain / masukan domain : " dom
-    echo -e "[ ${BGreen}INFO${NC} ] Using Custom Domain: $dom"
+    echo -e "[${BGreen}INFO${NC}] Using Custom Domain: $dom"
     mkdir -p /root/xray /etc/xray /etc/v2ray
     echo "$dom" | tee /root/domain /etc/xray/domain /etc/v2ray/domain /root/scdomain /root/xray/scdomain > /dev/null
-else
-    echo -e "[ ${BGreen}INFO${NC} ] Using Random Domain..."
-    bash /root/scripts/cf || { echo "[${BRed}ERROR${NC}] Cloudflare script failed"; exit 1; }
+else 
+    echo -e "[${BRed}ERROR${NC}] Invalid selection, continuing with default..."
 fi
 
-echo -e "[ ${BGreen}INFO${NC} ] Domain setup complete, continuing installation..."
+echo -e "[${BGreen}INFO${NC}] Domain setup complete, continuing installation..."
 sleep 1
-echo -e "${BGreen}Done!${NC}"
-sleep 2
-clear
     
 #install ssh ovpn
 echo -e "\e[33m-----------------------------------\033[0m"
