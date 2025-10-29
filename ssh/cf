@@ -1,4 +1,5 @@
 #!/bin/bash
+# Dependencies
 apt update -y && apt install -y jq curl
 
 # Random subdomain
@@ -11,30 +12,39 @@ IP=$(curl -s ipv4.icanhazip.com)
 echo "[*] Server IP: $IP"
 echo "[*] Subdomain to create: $SUB_DOMAIN"
 
-# Zone ID (already verified)
+# Zone ID
 ZONE="8761c8222fe8a4d1249e8563eedf43ee"
+echo "[*] Using Zone ID: $ZONE"
 
 # Check if record exists
-RECORD_ID=$(curl -sLX GET "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records?name=${SUB_DOMAIN}" \
+echo "[*] Checking if DNS record exists..."
+RESPONSE=$(curl -sLX GET "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records?name=${SUB_DOMAIN}" \
   -H "Authorization: Bearer ${CF_TOKEN}" \
-  -H "Content-Type: application/json" | jq -r '.result[0].id')
+  -H "Content-Type: application/json")
+echo "[DEBUG] GET Response: $RESPONSE"
+
+RECORD_ID=$(echo "$RESPONSE" | jq -r '.result[0].id')
+echo "[*] RECORD_ID=$RECORD_ID"
 
 if [[ -z "$RECORD_ID" || "$RECORD_ID" == "null" ]]; then
-  echo "[*] Record does not exist, creating..."
-  RECORD_ID=$(curl -sLX POST "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records" \
-     -H "Authorization: Bearer ${CF_TOKEN}" \
-     -H "Content-Type: application/json" \
-     --data "{\"type\":\"A\",\"name\":\"${SUB_DOMAIN}\",\"content\":\"${IP}\",\"ttl\":120,\"proxied\":false}" \
-     | jq -r '.result.id')
+    echo "[*] Record does not exist, creating..."
+    CREATE_RESPONSE=$(curl -sLX POST "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records" \
+        -H "Authorization: Bearer ${CF_TOKEN}" \
+        -H "Content-Type: application/json" \
+        --data "{\"type\":\"A\",\"name\":\"${SUB_DOMAIN}\",\"content\":\"${IP}\",\"ttl\":120,\"proxied\":false}")
+    echo "[DEBUG] POST Response: $CREATE_RESPONSE"
+    RECORD_ID=$(echo "$CREATE_RESPONSE" | jq -r '.result.id')
+    echo "[*] New RECORD_ID=$RECORD_ID"
 else
-  echo "[*] Record exists, updating..."
-  curl -sLX PUT "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records/${RECORD_ID}" \
-     -H "Authorization: Bearer ${CF_TOKEN}" \
-     -H "Content-Type: application/json" \
-     --data "{\"type\":\"A\",\"name\":\"${SUB_DOMAIN}\",\"content\":\"${IP}\",\"ttl\":120,\"proxied\":false}" >/dev/null
+    echo "[*] Record exists, updating..."
+    UPDATE_RESPONSE=$(curl -sLX PUT "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records/${RECORD_ID}" \
+        -H "Authorization: Bearer ${CF_TOKEN}" \
+        -H "Content-Type: application/json" \
+        --data "{\"type\":\"A\",\"name\":\"${SUB_DOMAIN}\",\"content\":\"${IP}\",\"ttl\":120,\"proxied\":false}")
+    echo "[DEBUG] PUT Response: $UPDATE_RESPONSE"
 fi
 
-# Save to files
+# Save subdomain
 mkdir -p /etc/xray /etc/v2ray /root/xray
 echo "$SUB_DOMAIN" | tee /root/domain /etc/xray/domain /etc/v2ray/domain /root/scdomain /root/xray/scdomain > /dev/null
 echo "IP=$SUB_DOMAIN" > /var/lib/ipvps.conf
