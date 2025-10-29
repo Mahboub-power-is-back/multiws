@@ -126,7 +126,7 @@ if test $dns -eq 1; then
     # Ensure cf script exists, download if missing
     if [ ! -f "/root/scripts/cf" ]; then
         mkdir -p /root/scripts
-        wget -O /root/scripts/cf https://raw.githubusercontent.com/givpn/AutoScriptXray/master/ssh/cf
+        wget -O /root/scripts/cf https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/refs/heads/master/ssh/cf
         chmod +x /root/scripts/cf
     fi
     /root/scripts/cf || { echo -e "[${BRed}ERROR${NC}] Cloudflare script failed, exiting"; exit 1; }
