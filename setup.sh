@@ -1,7 +1,4 @@
 #!/bin/bash
-# cari apa..?? harta tahta hanya sementara ingat masih ada kehidupan setelah kematian
-# jangan lupa sholat ingat ajal menantimu
-# dibawah ini bukan cd kaset ya
 cd
 rm -rf setup.sh
 clear
@@ -22,152 +19,120 @@ red() { echo -e "\\033[31;1m${*}\\033[0m"; }
 
 cd /root
 
-# System version number
 if [ "${EUID}" -ne 0 ]; then
-    echo "You need to run this script as root"
-    sleep 5
-    exit 1
+  echo "You need to run this script as root"
+  sleep 5
+  exit 1
 fi
 
 if [ "$(systemd-detect-virt)" == "openvz" ]; then
-    echo "OpenVZ is not supported"
-    clear
-    echo "For VPS with KVM and VMWare virtualization ONLY"
-    sleep 5
-    exit 1
+  echo "OpenVZ is not supported"
+  sleep 5
+  exit 1
 fi
 
 localip=$(hostname -I | cut -d\  -f1)
 hst=( `hostname` )
 dart=$(cat /etc/hosts | grep -w `hostname` | awk '{print $2}')
 if [[ "$hst" != "$dart" ]]; then
-    echo "$localip $(hostname)" >> /etc/hosts
+  echo "$localip $(hostname)" >> /etc/hosts
 fi
 
-# buat folder
 mkdir -p /etc/xray /etc/v2ray
-touch /etc/xray/domain /etc/v2ray/domain
-touch /etc/xray/scdomain /etc/v2ray/scdomain
+touch /etc/xray/domain /etc/v2ray/domain /etc/xray/scdomain /etc/v2ray/scdomain
 
-echo -e "[ ${BBlue}NOTES${NC} ] Before we go.. "
+echo -e "[ ${BBlue}NOTES${NC} ] Checking headers..."
 sleep 0.5
-echo -e "[ ${BBlue}NOTES${NC} ] I need check your headers first.."
-sleep 0.5
-echo -e "[ ${BGreen}INFO${NC} ] Checking headers"
-sleep 0.5
-
 totet=$(uname -r)
 REQUIRED_PKG="linux-headers-$totet"
-PKG_OK=$(dpkg-query -W --showformat='${Status}\n' $REQUIRED_PKG|grep "install ok installed")
-echo Checking for $REQUIRED_PKG: $PKG_OK
+PKG_OK=$(dpkg-query -W --showformat='${Status}\n' $REQUIRED_PKG | grep "install ok installed")
 if [ "" = "$PKG_OK" ]; then
-    echo -e "[ ${BRed}WARNING${NC} ] Try to install ...."
-    echo "No $REQUIRED_PKG. Setting up $REQUIRED_PKG."
-    apt-get --yes install $REQUIRED_PKG
-    echo -e "[ ${BBlue}NOTES${NC} ] If error you need to do this:"
-    echo -e "[ ${BBlue}NOTES${NC} ] apt update && apt upgrade -y && reboot"
-    read -p "Press enter to continue..."
+  echo -e "[ ${BRed}WARNING${NC} ] Linux headers missing, continuing anyway..."
+  # skip exit
 else
-    echo -e "[ ${BGreen}INFO${NC} ] Oke installed"
+  echo -e "[ ${BGreen}INFO${NC} ] Linux headers installed."
 fi
 
 secs_to_human() {
-    echo "Installation time : $(( ${1} / 3600 )) hours $(( (${1} / 60) % 60 )) minute's $(( ${1} % 60 )) seconds"
+  echo "Installation time : $(( ${1} / 3600 )) hours $(( (${1} / 60) % 60 )) minute's $(( ${1} % 60 )) seconds"
 }
-
 start=$(date +%s)
+
 ln -fs /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
 sysctl -w net.ipv6.conf.all.disable_ipv6=1 >/dev/null 2>&1
 sysctl -w net.ipv6.conf.default.disable_ipv6=1 >/dev/null 2>&1
 
-echo -e "[ ${BGreen}INFO${NC} ] Preparing the install file"
-apt install git curl -y >/dev/null 2>&1
-apt install python -y >/dev/null 2>&1
-echo -e "[ ${BGreen}INFO${NC} ] Installation file is ready"
-sleep 0.5
+apt install git curl python -y >/dev/null 2>&1
 
-mkdir -p /var/lib/ >/dev/null 2>&1
+mkdir -p /var/lib/
 echo "IP=" >> /var/lib/ipvps.conf
 
-# -------------------- DOMAIN SELECTION --------------------
 echo -e "$BBlue                     SETUP DOMAIN VPS     $NC"
 echo -e "$BYellow----------------------------------------------------------$NC"
 echo -e "$BGreen 1. Use Domain Random / Gunakan Domain Random $NC"
 echo -e "$BGreen 2. Choose Your Own Domain / Gunakan Domain Sendiri $NC"
 echo -e "$BYellow----------------------------------------------------------$NC"
-
 read -rp " input 1 or 2 / pilih 1 atau 2 : " dns
-dns=${dns:-1}  # default to 1
 
 if [[ "$dns" == "1" ]]; then
     echo -e "[${BGreen}INFO${NC}] Using Random Domain..."
-    ( /bin/bash /root/scripts/cf ) || { echo -e "[${BRed}ERROR${NC}] Cloudflare script failed, continuing..."; }
+    if [ -f /root/scripts/cf ]; then
+        /bin/bash /root/scripts/cf
+    else
+        echo -e "[${BRed}WARNING${NC}] /root/scripts/cf not found, skipping..."
+    fi
 elif [[ "$dns" == "2" ]]; then
     read -rp "Enter Your Domain / masukan domain : " dom
-    if [[ -z "$dom" ]]; then
-        echo -e "[${BRed}ERROR${NC}] No domain entered. Using random domain instead."
-        ( /bin/bash /root/scripts/cf ) || true
-    else
-        echo -e "[${BGreen}INFO${NC}] Using Custom Domain: $dom"
-        mkdir -p /root/xray /etc/xray /etc/v2ray
-        echo "$dom" | tee /root/domain /etc/xray/domain /etc/v2ray/domain /root/scdomain /root/xray/scdomain > /dev/null
-    fi
-else
-    echo -e "[${BRed}ERROR${NC}] Invalid selection, using random domain..."
-    ( /bin/bash /root/scripts/cf ) || true
+    echo -e "[${BGreen}INFO${NC}] Using Custom Domain: $dom"
+    mkdir -p /root/xray /etc/xray /etc/v2ray
+    echo "$dom" | tee /root/domain /etc/xray/domain /etc/v2ray/domain /root/scdomain /root/xray/scdomain > /dev/null
+else 
+    echo -e "[${BRed}ERROR${NC}] Invalid selection, continuing..."
 fi
 
-echo -e "[${BGreen}INFO${NC}] Domain setup complete, continuing installation..."
 sleep 1
-# ------------------------------------------------------------
 
-#install ssh ovpn
-echo -e "\e[33m-----------------------------------\033[0m"
+# Install SSH Websocket
 echo -e "$BGreen      Install SSH Websocket           $NC"
-echo -e "\e[33m-----------------------------------\033[0m"
-sleep 0.5
-clear
-wget https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/ssh-vpn.sh && chmod +x ssh-vpn.sh && ./ssh-vpn.sh
+wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/ssh-vpn.sh -O ssh-vpn.sh
+if [ -f ssh-vpn.sh ]; then
+    chmod +x ssh-vpn.sh
+    ./ssh-vpn.sh
+else
+    echo -e "[${BRed}ERROR${NC}] ssh-vpn.sh download failed, continuing..."
+fi
 
 # Install Xray
-echo -e "\e[33m-----------------------------------\033[0m"
 echo -e "$BGreen          Install XRAY              $NC"
-echo -e "\e[33m-----------------------------------\033[0m"
-sleep 0.5
-clear
-wget https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/xray/ins-xray.sh && chmod +x ins-xray.sh && ./ins-xray.sh
-wget https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/sshws/insshws.sh && chmod +x insshws.sh && ./insshws.sh
-clear
+wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/xray/ins-xray.sh -O ins-xray.sh
+if [ -f ins-xray.sh ]; then
+    chmod +x ins-xray.sh
+    ./ins-xray.sh
+else
+    echo -e "[${BRed}ERROR${NC}] ins-xray.sh download failed, continuing..."
+fi
 
+wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/sshws/insshws.sh -O insshws.sh
+if [ -f insshws.sh ]; then
+    chmod +x insshws.sh
+    ./insshws.sh
+else
+    echo -e "[${BRed}ERROR${NC}] insshws.sh download failed, continuing..."
+fi
+
+# Setup profile
 cat> /root/.profile << END
-# ~/.profile: executed by Bourne-compatible login shells.
-
-if [ "$BASH" ]; then
+if [ "\$BASH" ]; then
   if [ -f ~/.bashrc ]; then
     . ~/.bashrc
   fi
 fi
-
 mesg n || true
 clear
 menu
 END
 chmod 644 /root/.profile
 
-# Clean logs if exist
-rm -f /root/log-install.txt /etc/afak.conf
-for f in ssh vmess vless trojan shadowsocks; do
-  [[ -f /etc/log-create-$f.log ]] || echo "Log $f Account" > /etc/log-create-$f.log
-done
-
-history -c
-serverV=$(curl -sS https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/menu/versi)
-echo $serverV > /opt/.ver
-curl -sS ipv4.icanhazip.com > /etc/myipvps
-
-secs_to_human "$(($(date +%s) - ${start}))" | tee -a log-install.txt
-echo -e ""
-echo " Auto reboot in 10 Seconds "
+echo -e "[${BGreen}INFO${NC}] Installation complete. Rebooting in 10 seconds..."
 sleep 10
-rm -rf setup.sh
 reboot
