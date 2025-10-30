@@ -206,7 +206,42 @@ clear
 menu
 END
 chmod 644 /root/.profile
+echo "" | tee -a log-install.txt
+echo "┌───────────────────────────────────────────────────────────────┐" | tee -a log-install.txt
+echo "│                         SERVICE & PORTS                        │" | tee -a log-install.txt
+echo "└───────────────────────────────────────────────────────────────┘" | tee -a log-install.txt
+echo "   - OpenSSH                  : 22"  | tee -a log-install.txt
+echo "   - SSH Websocket            : 80" | tee -a log-install.txt
+echo "   - SSH SSL Websocket        : 443" | tee -a log-install.txt
+echo "   - Stunnel4                 : 222, 777" | tee -a log-install.txt
+echo "   - Dropbear                 : 109, 143" | tee -a log-install.txt
+echo "   - Badvpn                   : 7100-7900" | tee -a log-install.txt
+echo "   - Nginx                    : 81" | tee -a log-install.txt
+echo "   - Vmess WS TLS             : 443" | tee -a log-install.txt
+echo "   - Vless WS TLS             : 443" | tee -a log-install.txt
+echo "   - Trojan WS TLS            : 443" | tee -a log-install.txt
+echo "   - Shadowsocks WS TLS       : 443" | tee -a log-install.txt
+echo "   - Vmess WS none TLS        : 80" | tee -a log-install.txt
+echo "   - Vless WS none TLS        : 80" | tee -a log-install.txt
+echo "   - Trojan WS none TLS       : 80" | tee -a log-install.txt
+echo "   - Shadowsocks WS none TLS  : 80" | tee -a log-install.txt
+echo "   - Vmess gRPC               : 443" | tee -a log-install.txt
+echo "   - Vless gRPC               : 443" | tee -a log-install.txt
+echo "   - Trojan gRPC              : 443" | tee -a log-install.txt
+echo "   - Shadowsocks gRPC         : 443" | tee -a log-install.txt
+echo "" | tee -a log-install.txt
 
+echo "┌───────────────────────────────────────────────────────────────┐" | tee -a log-install.txt
+echo "│                          CHANGE LOG                                       │" | tee -a log-install.txt
+echo "└───────────────────────────────────────────────────────────────┘" | tee -a log-install.txt
+echo "   MAHBOUB : Improved log formatting & added Telegram contact" | tee -a log-install.txt
+echo "" | tee -a log-install.txt
+
+echo "┌───────────────────────────────────────────────────────────────┐" | tee -a log-install.txt
+echo "│                          CONTACT                                          │" | tee -a log-install.txt
+echo "└───────────────────────────────────────────────────────────────┘" | tee -a log-install.txt
+echo "   Telegram : t.me/vpsplus71" | tee -a log-install.txt
+echo "" | tee -a log-install.txt
 # Logs
 for log in ssh vmess vless trojan shadowsocks; do
     if [ ! -f "/etc/log-create-$log.log" ]; then
