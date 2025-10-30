@@ -1,201 +1,268 @@
-#!/bin/bash
-# cari apa..?? harta tahta hanya sementara ingat masih ada kehidupan setelah kematian
-# jangan lupa sholat ingat ajal menantimu
-# dibawah ini bukan cd kaset ya
-cd
-rm -rf setup.sh
-clear
-red='\e[1;31m'
-green='\e[0;32m'
-yell='\e[1;33m'
-tyblue='\e[1;36m'
-BRed='\e[1;31m'
-BGreen='\e[1;32m'
-BYellow='\e[1;33m'
-BBlue='\e[1;34m'
-NC='\e[0m'
-purple() { echo -e "\\033[35;1m${*}\\033[0m"; }
-tyblue() { echo -e "\\033[36;1m${*}\\033[0m"; }
-yellow() { echo -e "\\033[33;1m${*}\\033[0m"; }
-green() { echo -e "\\033[32;1m${*}\\033[0m"; }
-red() { echo -e "\\033[31;1m${*}\\033[0m"; }
-cd /root
+#!/usr/bin/env bash
+#
+# Fixed full installer script (cleaned, safer prompts, color escapes fixed)
+# Keep the original reminders / banner text at the top
+#
+# NOTE: run as root (script checks automatically)
 
-#System version number
-if [ "${EUID}" -ne 0 ]; then
-    echo "You need to run this script as root"
-    sleep 5
-    exit 1
-fi
-if [ "$(systemd-detect-virt)" == "openvz" ]; then
-    echo "OpenVZ is not supported"
-    clear
-    echo "For VPS with KVM and VMWare virtualization ONLY"
-    sleep 5
-    exit 1
-fi
-
-localip=$(hostname -I | cut -d\  -f1)
-hst=( `hostname` )
-dart=$(cat /etc/hosts | grep -w `hostname` | awk '{print $2}')
-if [[ "$hst" != "$dart" ]]; then
-    echo "$localip $(hostname)" >> /etc/hosts
-fi
-
-# buat folder
-mkdir -p /etc/xray
-mkdir -p /etc/v2ray
-touch /etc/xray/domain
-touch /etc/v2ray/domain
-touch /etc/xray/scdomain
-touch /etc/v2ray/scdomain
-
-echo -e "[ ${BBlue}NOTES${NC} ] Before we go.. "
-sleep 0.5
-echo -e "[ ${BBlue}NOTES${NC} ] I need check your headers first.."
-sleep 0.5
-echo -e "[ ${BGreen}INFO${NC} ] Checking headers"
-sleep 0.5
-totet=`uname -r`
-REQUIRED_PKG="linux-headers-$totet"
-PKG_OK=$(dpkg-query -W --showformat='${Status}\n' $REQUIRED_PKG|grep "install ok installed")
-echo Checking for $REQUIRED_PKG: $PKG_OK
-if [ "" = "$PKG_OK" ]; then
-    sleep 0.5
-    echo -e "[ ${BRed}WARNING${NC} ] Try to install ...."
-    echo "No $REQUIRED_PKG. Setting up $REQUIRED_PKG."
-    apt-get --yes install $REQUIRED_PKG
-    sleep 0.5
-    echo ""
-    sleep 0.5
-    echo -e "[ ${BBlue}NOTES${NC} ] If error you need.. to do this"
-    sleep 0.5
-    echo ""
-    sleep 0.5
-    echo -e "[ ${BBlue}NOTES${NC} ] apt update && apt upgrade -y && reboot"
-    sleep 0.5
-    echo ""
-    sleep 0.5
-    echo -e "[ ${BBlue}NOTES${NC} ] After this"
-    sleep 0.5
-    echo -e "[ ${BBlue}NOTES${NC} ] Then run this script again"
-    echo -e "[ ${BBlue}NOTES${NC} ] enter now"
-    read
-else
-    echo -e "[ ${BGreen}INFO${NC} ] Oke installed"
-fi
-
-ttet=`uname -r`
-ReqPKG="linux-headers-$ttet"
-if ! dpkg -s $ReqPKG >/dev/null 2>&1; then
-    rm /root/setup.sh >/dev/null 2>&1
-    exit
-else
-    clear
-fi
-
-secs_to_human() {
-    echo "Installation time : $(( ${1} / 3600 )) hours $(( (${1} / 60) % 60 )) minute's $(( ${1} % 60 )) seconds"
-}
-start=$(date +%s)
-ln -fs /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
-sysctl -w net.ipv6.conf.all.disable_ipv6=1 >/dev/null 2>&1
-sysctl -w net.ipv6.conf.default.disable_ipv6=1 >/dev/null 2>&1
-
-echo -e "[ ${BGreen}INFO${NC} ] Preparing the install file"
-apt install git curl python -y >/dev/null 2>&1
-echo -e "[ ${BGreen}INFO${NC} ] Aight good ... installation file is ready"
-sleep 0.5
-echo -ne "[ ${BGreen}INFO${NC} ] Check permission : "
-echo -e "$BGreen Permission Accepted!$NC"
-sleep 2
-
-mkdir -p /var/lib/ >/dev/null 2>&1
-echo "IP=" >> /var/lib/ipvps.conf
-
+# ------------------------------------------------------------------
+# Reminders from original
+# ------------------------------------------------------------------
 echo ""
+echo "=================================================================="
+echo "    cari apa..?? harta tahta hanya sementara ingat masih ada kehidupan setelah kematian"
+echo "    jangan lupa sholat ingat ajal menantimu"
+echo "    dibawah ini bukan cd kaset ya"
+echo ""
+
+# ------------------------------------------------------------------
+# Cleanup old setup file (if any) and chdir root
+# ------------------------------------------------------------------
+cd /root || exit 1
+rm -f setup.sh >/dev/null 2>&1
 clear
-# Colors
-NC='\033[0m'
-GREEN='\033[0;32m'
-LIGHTGREEN='\033[1;32m'
-CYAN='\033[0;36m'
 
+# ------------------------------------------------------------------
+# Colors (use $'...' so escapes become real bytes)
+# ------------------------------------------------------------------
+NC=$'\e[0m'
+RED=$'\e[1;31m'
+GREEN=$'\e[0;32m'
+YELLOW=$'\e[1;33m'
+TYBLUE=$'\e[1;36m'
+BRED=$'\e[1;31m'
+BGREEN=$'\e[1;32m'
+BYELLOW=$'\e[1;33m'
+BBLUE=$'\e[1;34m'
+
+# helper colored-echos (safely)
+p_purple() { printf "%b%s%b\n" $'\e[35;1m' "$*" "$NC"; }
+p_tyblue() { printf "%b%s%b\n" $'\e[36;1m' "$*" "$NC"; }
+p_yellow() { printf "%b%s%b\n" $'\e[33;1m' "$*" "$NC"; }
+p_green() { printf "%b%s%b\n" $'\e[32;1m' "$*" "$NC"; }
+p_red() { printf "%b%s%b\n" $'\e[31;1m' "$*" "$NC"; }
+
+# ------------------------------------------------------------------
+# Root check
+# ------------------------------------------------------------------
+if [ "${EUID:-0}" -ne 0 ]; then
+    echo "You need to run this script as root"
+    sleep 3
+    exit 1
+fi
+
+# Virtualization check
+if [ "$(systemd-detect-virt 2>/dev/null)" = "openvz" ]; then
+    echo "OpenVZ is not supported. For VPS with KVM and VMWare virtualization ONLY"
+    sleep 3
+    exit 1
+fi
+
+# ------------------------------------------------------------------
+# Ensure /etc/hosts contains the hostname mapping (if absent)
+# ------------------------------------------------------------------
+localip=$(hostname -I 2>/dev/null | awk '{print $1}')
+myhost=$(hostname)
+if ! grep -q -w "$myhost" /etc/hosts 2>/dev/null; then
+    if [ -n "$localip" ]; then
+        echo "$localip $myhost" >> /etc/hosts
+    else
+        echo "127.0.0.1 $myhost" >> /etc/hosts
+    fi
+fi
+
+# ------------------------------------------------------------------
+# Create required directories and files
+# ------------------------------------------------------------------
+mkdir -p /etc/xray /etc/v2ray /root/scripts /var/lib 2>/dev/null
+touch /etc/xray/domain /etc/v2ray/domain /etc/xray/scdomain /etc/v2ray/scdomain /root/scdomain
+
+# ------------------------------------------------------------------
+# Print small startup notes (friendly)
+# ------------------------------------------------------------------
+printf "[ %bNOTES%b ] Before we go..\n" "$BBLUE" "$NC"
+sleep 0.4
+printf "[ %bNOTES%b ] I will check your kernel headers first..\n" "$BBLUE" "$NC"
+sleep 0.4
+printf "[ %bINFO%b ] Checking headers\n" "$BGREEN" "$NC"
+sleep 0.4
+
+# ------------------------------------------------------------------
+# Check for linux-headers for current kernel
+# ------------------------------------------------------------------
+kernelver=$(uname -r)
+required_pkg="linux-headers-$kernelver"
+if ! dpkg-query -W --showformat='${Status}\n' "$required_pkg" 2>/dev/null | grep -q "install ok installed"; then
+    printf "[ %bWARNING%b ] %s not found. Attempting to install.\n" "$BRED" "$NC" "$required_pkg"
+    apt-get update -y >/dev/null 2>&1 || true
+    apt-get --yes install "$required_pkg" || {
+        printf "[ %bERROR%b ] Could not install %s. Run:\n  apt update && apt upgrade -y && reboot\nthen rerun this script\n" "$BRED" "$NC" "$required_pkg"
+        read -rp "Press Enter to exit..." _
+        exit 1
+    }
+else
+    printf "[ %bINFO%b ] Headers installed (%s)\n" "$BGREEN" "$NC" "$required_pkg"
+fi
+
+# Re-check quickly
+if ! dpkg -s "$required_pkg" >/dev/null 2>&1; then
+    printf "[ %bERROR%b ] Required headers still missing. Exiting.\n" "$BRED" "$NC"
+    exit 1
+fi
+
+# ------------------------------------------------------------------
+# Utility functions & timer
+# ------------------------------------------------------------------
+secs_to_human() {
+    printf "Installation time : %d hours %d minute's %d seconds\n" \
+      "$(( $1 / 3600 ))" "$(( ($1 / 60) % 60 ))" "$(( $1 % 60 ))"
+}
+
+start_time=$(date +%s)
+
+# timezone and kernel tweaks (as original)
+ln -fs /usr/share/zoneinfo/Asia/Jakarta /etc/localtime 2>/dev/null || true
+sysctl -w net.ipv6.conf.all.disable_ipv6=1 >/dev/null 2>&1 || true
+sysctl -w net.ipv6.conf.default.disable_ipv6=1 >/dev/null 2>&1 || true
+
+# ------------------------------------------------------------------
+# Prepare basic tools
+# ------------------------------------------------------------------
+printf "[ %bINFO%b ] Preparing the install file\n" "$BGREEN" "$NC"
+DEBIAN_FRONTEND=noninteractive apt-get update -y >/dev/null 2>&1 || true
+DEBIAN_FRONTEND=noninteractive apt-get install -y git curl python3 jq dos2unix wget >/dev/null 2>&1 || true
+printf "[ %bINFO%b ] Installation file is ready\n" "$BGREEN" "$NC"
+sleep 0.4
+
+# mark IP config file
+echo "IP=" > /var/lib/ipvps.conf
+
+# ------------------------------------------------------------------
+# DOMAIN CONFIG MENU (cyber/hacker style)
+# ------------------------------------------------------------------
 clear
-echo -e "${GREEN}┌──────────────────────────────────────────────────────────┐${NC}"
-echo -e "${GREEN}│${CYAN}                 DOMAIN CONFIGURATION MENU               ${GREEN}│${NC}"
-echo -e "${GREEN}└──────────────────────────────────────────────────────────┘${NC}"
-echo -e "${LIGHTGREEN}  [1]${NC} Use Random Domain"
-echo -e "${LIGHTGREEN}  [2]${NC} Use Your Own Domain"
-echo -e "${GREEN}────────────────────────────────────────────────────────────${NC}"
-read -rp " Select option ${CYAN}(1/2)${NC}: " dns
+GREEN=$'\e[0;32m'
+LIGHTGREEN=$'\e[1;32m'
+CYAN=$'\e[0;36m'
+NC=$'\e[0m'
 
-# Hacker Loading Effect
-echo -e "${CYAN}\nInitializing..."
-sleep 0.3
-for i in {1..20}; do
-    echo -ne "${GREEN}█${NC}"
-    sleep 0.05
-done
-echo -e "\n${LIGHTGREEN}Done!${NC}\n"
+printf "%b┌──────────────────────────────────────────────────────────┐%b\n" "$GREEN" "$NC"
+printf "%b│%b%40s%10b│%b\n" "$GREEN" "$CYAN" "DOMAIN CONFIGURATION MENU" "$GREEN" "$NC"
+printf "%b└──────────────────────────────────────────────────────────┘%b\n" "$GREEN" "$NC"
+printf "%b  [1] %bUse Random Domain%b\n" "$LIGHTGREEN" "$NC" "$NC"
+printf "%b  [2] %bUse Your Own Domain%b\n" "$LIGHTGREEN" "$NC" "$NC"
+printf "%b────────────────────────────────────────────────────────────%b\n" "$GREEN" "$NC"
+printf "%bSelect option (%b1%b/%b2%b): %b" "$CYAN" "$LIGHTGREEN" "$CYAN" "$LIGHTGREEN" "$CYAN" "$NC"
 
-if test $dns -eq 1; then
-    # Ensure dependencies
-    apt update
-    apt install -y curl jq dos2unix
+# read without embedded escape sequences
+read -r dns
 
-    # Ensure cf script exists
+# validate and handle input
+case "$dns" in
+  1)
+    # Ensure dependencies present
+    apt-get update -y >/dev/null 2>&1 || true
+    apt-get install -y curl jq dos2unix wget || true
+
+    # download cf helper script into /root/scripts
     mkdir -p /root/scripts
-    wget -O /root/scripts/cf https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/refs/heads/master/ssh/cf
-    dos2unix /root/scripts/cf
-    chmod +x /root/scripts/cf
-
-    # Run cf script safely
-    bash /root/scripts/cf
-    if [ $? -ne 0 ]; then
-        echo -e "[${BRed}ERROR${NC}] Cloudflare script failed, exiting"
+    CF_URL="https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/cf"
+    if ! wget -q -O /root/scripts/cf "$CF_URL"; then
+        printf "[ %bERROR%b ] Failed to download Cloudflare helper: %s\n" "$BRED" "$NC" "$CF_URL"
         exit 1
     fi
-elif test $dns -eq 2; then
-    read -rp "Enter Your Domain / masukan domain : " dom
-    echo "IP=$dom" > /var/lib/ipvps.conf
-    echo "$dom" > /root/scdomain
-    echo "$dom" > /etc/xray/scdomain
-    echo "$dom" > /etc/xray/domain
-    echo "$dom" > /etc/v2ray/domain
-    echo "$dom" > /root/domain
-else 
-    echo -e "[${BRed}ERROR${NC}] Invalid selection"
+    dos2unix /root/scripts/cf >/dev/null 2>&1 || true
+    chmod +x /root/scripts/cf || true
+
+    # run it and fail safe
+    bash /root/scripts/cf || {
+        printf "[ %bERROR%b ] Cloudflare script failed. Exiting.\n" "$BRED" "$NC"
+        exit 1
+    }
+    ;;
+  2)
+    printf "%bEnter your domain: %b" "$CYAN" "$NC"
+    read -r dom
+    if [ -z "$dom" ]; then
+        printf "[ %bERROR%b ] Empty domain. Exiting.\n" "$BRED" "$NC"
+        exit 1
+    fi
+    # persist domain
+    printf "IP=%s\n" "$dom" > /var/lib/ipvps.conf
+    printf "%s\n" "$dom" > /root/scdomain
+    printf "%s\n" "$dom" > /etc/xray/scdomain
+    printf "%s\n" "$dom" > /etc/xray/domain
+    printf "%s\n" "$dom" > /etc/v2ray/domain
+    printf "%s\n" "$dom" > /root/domain
+    ;;
+  *)
+    printf "\n%b[ %bERROR%b ] Invalid selection. Exiting.%b\n" "$BRED" "$NC" "$BRED" "$NC"
     exit 1
+    ;;
+esac
+
+# ------------------------------------------------------------------
+# Loading animation (progress bar + spinner)
+# ------------------------------------------------------------------
+printf "\n%bInitializing...%b\n" "$CYAN" "$NC"
+total=24
+for ((i=1; i<=total; i++)); do
+    printf "%b█%b" "$GREEN" "$NC"
+    sleep 0.04
+done
+printf " %bDone%b\n" "$LIGHTGREEN" "$NC"
+
+spinner=( '|' '/' '-' '\' )
+printf "%bFinalizing " "$CYAN"
+for i in {1..12}; do
+    idx=$(( i % ${#spinner[@]} ))
+    printf "\b%b%c%b" "$LIGHTGREEN" "${spinner[$idx]}" "$NC"
+    sleep 0.07
+done
+printf "\b%b OK%b\n\n" "$LIGHTGREEN" "$NC"
+
+# ------------------------------------------------------------------
+# Install services (as in original)
+# ------------------------------------------------------------------
+
+printf "%b-----------------------------------%b\n" "$YELLOW" "$NC"
+printf "%b      Install SSH Websocket           %b\n" "$BGREEN" "$NC"
+printf "%b-----------------------------------%b\n" "$YELLOW" "$NC"
+sleep 0.5
+# download and run ssh installer (note: maintainers may change)
+if wget -q -O /root/ssh-vpn.sh "https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/ssh-vpn.sh"; then
+    chmod +x /root/ssh-vpn.sh
+    /bin/bash /root/ssh-vpn.sh
+else
+    printf "[ %bWARN%b ] Could not download ssh-vpn.sh, skipping.\n" "$BYELLOW" "$NC"
 fi
 
-echo -e "${BGreen}Done!${NC}"
-sleep 2
-clear
-
-#install ssh ovpn
-echo -e "\e[33m-----------------------------------\033[0m"
-echo -e "$BGreen      Install SSH Websocket           $NC"
-echo -e "\e[33m-----------------------------------\033[0m"
+# Install Xray
+printf "%b-----------------------------------%b\n" "$YELLOW" "$NC"
+printf "%b          Install XRAY              %b\n" "$BGREEN" "$NC"
+printf "%b-----------------------------------%b\n" "$YELLOW" "$NC"
 sleep 0.5
-clear
-wget https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/refs/heads/master/ssh/ssh-vpn.sh && chmod +x ssh-vpn.sh && ./ssh-vpn.sh
+if wget -q -O /root/ins-xray.sh "https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/xray/ins-xray.sh"; then
+    chmod +x /root/ins-xray.sh
+    /bin/bash /root/ins-xray.sh
+else
+    printf "[ %bWARN%b ] Could not download ins-xray.sh, skipping.\n" "$BYELLOW" "$NC"
+fi
 
-#Install Xray
-echo -e "\e[33m-----------------------------------\033[0m"
-echo -e "$BGreen          Install XRAY              $NC"
-echo -e "\e[33m-----------------------------------\033[0m"
-sleep 0.5
-clear
-wget https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/refs/heads/master/xray/ins-xray.sh && chmod +x ins-xray.sh && ./ins-xray.sh
-wget https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/refs/heads/master/sshws/insshws.sh && chmod +x insshws.sh && ./insshws.sh
-clear
+if wget -q -O /root/insshws.sh "https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/sshws/insshws.sh"; then
+    chmod +x /root/insshws.sh
+    /bin/bash /root/insshws.sh
+else
+    printf "[ %bWARN%b ] Could not download insshws.sh, skipping.\n" "$BYELLOW" "$NC"
+fi
 
-# Setup .profile to launch menu
-cat> /root/.profile << END
+# ------------------------------------------------------------------
+# Setup .profile to launch menu on login
+# ------------------------------------------------------------------
+cat > /root/.profile <<'END_PROFILE'
 # ~/.profile: executed by Bourne-compatible login shells.
 
-if [ "\$BASH" ]; then
+if [ "$BASH" ]; then
   if [ -f ~/.bashrc ]; then
     . ~/.bashrc
   fi
@@ -204,57 +271,69 @@ fi
 mesg n || true
 clear
 menu
-END
+END_PROFILE
 chmod 644 /root/.profile
-echo "" | tee -a log-install.txt
-echo "┌───────────────────────────────────────────────────────────────┐" | tee -a log-install.txt
-echo "│                         SERVICE & PORTS                        │" | tee -a log-install.txt
-echo "└───────────────────────────────────────────────────────────────┘" | tee -a log-install.txt
-echo "   - OpenSSH                  : 22"  | tee -a log-install.txt
-echo "   - SSH Websocket            : 80" | tee -a log-install.txt
-echo "   - SSH SSL Websocket        : 443" | tee -a log-install.txt
-echo "   - Stunnel4                 : 222, 777" | tee -a log-install.txt
-echo "   - Dropbear                 : 109, 143" | tee -a log-install.txt
-echo "   - Badvpn                   : 7100-7900" | tee -a log-install.txt
-echo "   - Nginx                    : 81" | tee -a log-install.txt
-echo "   - Vmess WS TLS             : 443" | tee -a log-install.txt
-echo "   - Vless WS TLS             : 443" | tee -a log-install.txt
-echo "   - Trojan WS TLS            : 443" | tee -a log-install.txt
-echo "   - Shadowsocks WS TLS       : 443" | tee -a log-install.txt
-echo "   - Vmess WS none TLS        : 80" | tee -a log-install.txt
-echo "   - Vless WS none TLS        : 80" | tee -a log-install.txt
-echo "   - Trojan WS none TLS       : 80" | tee -a log-install.txt
-echo "   - Shadowsocks WS none TLS  : 80" | tee -a log-install.txt
-echo "   - Vmess gRPC               : 443" | tee -a log-install.txt
-echo "   - Vless gRPC               : 443" | tee -a log-install.txt
-echo "   - Trojan gRPC              : 443" | tee -a log-install.txt
-echo "   - Shadowsocks gRPC         : 443" | tee -a log-install.txt
-echo "" | tee -a log-install.txt
 
-echo "┌───────────────────────────────────────────────────────────────┐" | tee -a log-install.txt
-echo "│                          CHANGE LOG                                       │" | tee -a log-install.txt
-echo "└───────────────────────────────────────────────────────────────┘" | tee -a log-install.txt
-echo "   MAHBOUB : Improved log formatting & added Telegram contact" | tee -a log-install.txt
-echo "" | tee -a log-install.txt
+# ------------------------------------------------------------------
+# Write a clean, framed log (to /root/log-install.txt)
+# ------------------------------------------------------------------
+LOG="/root/log-install.txt"
+{
+    echo ""
+    printf "┌───────────────────────────────────────────────────────────────┐\n"
+    printf "│                         SERVICE & PORTS                                  │\n"
+    printf "└───────────────────────────────────────────────────────────────┘\n"
+    echo "   - OpenSSH                  : 22"
+    echo "   - SSH Websocket            : 80"
+    echo "   - SSH SSL Websocket        : 443"
+    echo "   - Stunnel4                 : 222, 777"
+    echo "   - Dropbear                 : 109, 143"
+    echo "   - Badvpn                   : 7100-7900"
+    echo "   - Nginx                    : 81"
+    echo "   - Vmess WS TLS             : 443"
+    echo "   - Vless WS TLS             : 443"
+    echo "   - Trojan WS TLS            : 443"
+    echo "   - Shadowsocks WS TLS       : 443"
+    echo "   - Vmess WS none TLS        : 80"
+    echo "   - Vless WS none TLS        : 80"
+    echo "   - Trojan WS none TLS       : 80"
+    echo "   - Shadowsocks WS none TLS  : 80"
+    echo "   - Vmess gRPC               : 443"
+    echo "   - Vless gRPC               : 443"
+    echo "   - Trojan gRPC              : 443"
+    echo "   - Shadowsocks gRPC         : 443"
+    echo ""
+    printf "┌───────────────────────────────────────────────────────────────┐\n"
+    printf "│                          CHANGE LOG                                       │\n"
+    printf "└───────────────────────────────────────────────────────────────┘\n"
+    echo "   MAHBOUB : Improved log formatting & added Telegram contact"
+    echo ""
+    printf "┌───────────────────────────────────────────────────────────────┐\n"
+    printf "│                           CONTACT                                         │\n"
+    printf "└───────────────────────────────────────────────────────────────┘\n"
+    echo "   Telegram : t.me/vpsplus71"
+    echo ""
+} >>"$LOG"
 
-echo "┌───────────────────────────────────────────────────────────────┐" | tee -a log-install.txt
-echo "│                          CONTACT                                          │" | tee -a log-install.txt
-echo "└───────────────────────────────────────────────────────────────┘" | tee -a log-install.txt
-echo "   Telegram : t.me/vpsplus71" | tee -a log-install.txt
-echo "" | tee -a log-install.txt
-# Logs
+# Ensure per-service account log files exist
 for log in ssh vmess vless trojan shadowsocks; do
-    if [ ! -f "/etc/log-create-$log.log" ]; then
-        echo "Log $log Account " > /etc/log-create-$log.log
+    file="/etc/log-create-$log.log"
+    if [ ! -f "$file" ]; then
+        printf "Log %s Account\n" "$log" > "$file"
     fi
 done
 
-history -c
+# Clear history for privacy (as original)
+history -c 2>/dev/null || true
 
-# Install finished
-echo -e "${BGreen}Installation Finished!${NC}"
-secs_to_human "$(($(date +%s) - ${start}))" | tee -a /root/log-install.txt
-echo -e "Auto reboot in 10 seconds..."
+# Final message and timing
+end_time=$(date +%s)
+printf "%bInstallation Finished!%b\n" "$BGREEN" "$NC"
+secs_to_human $((end_time - start_time)) | tee -a "$LOG"
+
+printf "%bAuto reboot in 10 seconds...%b\n" "$YELLOW" "$NC"
 sleep 10
-rm -rf setup.sh
+
+# cleanup & reboot
+rm -f /root/setup.sh >/dev/null 2>&1
 reboot
