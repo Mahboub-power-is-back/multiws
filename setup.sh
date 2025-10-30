@@ -115,12 +115,29 @@ echo "IP=" >> /var/lib/ipvps.conf
 
 echo ""
 clear
-echo -e "$BBlue                     SETUP DOMAIN VPS     $NC"
-echo -e "$BYellow----------------------------------------------------------$NC"
-echo -e "$BGreen 1. Use Domain Random / Gunakan Domain Random $NC"
-echo -e "$BGreen 2. Choose Your Own Domain / Gunakan Domain Sendiri $NC"
-echo -e "$BYellow----------------------------------------------------------$NC"
-read -rp " input 1 or 2 / pilih 1 atau 2 : " dns
+# Colors
+NC='\033[0m'
+GREEN='\033[0;32m'
+LIGHTGREEN='\033[1;32m'
+CYAN='\033[0;36m'
+
+clear
+echo -e "${GREEN}┌──────────────────────────────────────────────────────────┐${NC}"
+echo -e "${GREEN}│${CYAN}                 DOMAIN CONFIGURATION MENU               ${GREEN}│${NC}"
+echo -e "${GREEN}└──────────────────────────────────────────────────────────┘${NC}"
+echo -e "${LIGHTGREEN}  [1]${NC} Use Random Domain"
+echo -e "${LIGHTGREEN}  [2]${NC} Use Your Own Domain"
+echo -e "${GREEN}────────────────────────────────────────────────────────────${NC}"
+read -rp " Select option ${CYAN}(1/2)${NC}: " dns
+
+# Hacker Loading Effect
+echo -e "${CYAN}\nInitializing..."
+sleep 0.3
+for i in {1..20}; do
+    echo -ne "${GREEN}█${NC}"
+    sleep 0.05
+done
+echo -e "\n${LIGHTGREEN}Done!${NC}\n"
 
 if test $dns -eq 1; then
     # Ensure dependencies
