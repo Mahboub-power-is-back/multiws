@@ -375,17 +375,43 @@ EOF
 #nginx config
 cat >/etc/nginx/conf.d/xray.conf <<EOF
     server {
-             listen 80;
-             listen [::]:80;
-             listen 443 ssl http2 reuseport;
-             listen [::]:443 http2 reuseport;	
-             server_name *.$domain;
-             ssl_certificate /etc/xray/xray.crt;
-             ssl_certificate_key /etc/xray/xray.key;
-             ssl_ciphers EECDH+CHACHA20:EECDH+CHACHA20-draft:EECDH+ECDSA+AES128:EECDH+aRSA+AES128:RSA+AES128:EECDH+ECDSA+AES256:EECDH+aRSA+AES256:RSA+AES256:EECDH+ECDSA+3DES:EECDH+aRSA+3DES:RSA+3DES:!MD5;
-             ssl_protocols TLSv1.1 TLSv1.2 TLSv1.3;
-             root /home/vps/public_html;
-        }
+    # HTTP / WS (non-TLS)
+    listen 80;
+    listen [::]:80;
+    listen 8080;
+    listen [::]:8080;
+    listen 8880;
+    listen [::]:8880;
+    listen 2052;
+    listen [::]:2052;
+    listen 2082;
+    listen [::]:2082;
+    listen 2086;
+    listen [::]:2086;
+    listen 2095;
+    listen [::]:2095;
+
+    # HTTPS / WSS (TLS)
+    listen 443 ssl http2 reuseport;
+    listen [::]:443 ssl http2 reuseport;
+    listen 2053 ssl http2;
+    listen [::]:2053 ssl http2;
+    listen 2083 ssl http2;
+    listen [::]:2083 ssl http2;
+    listen 2087 ssl http2;
+    listen [::]:2087 ssl http2;
+    listen 2096 ssl http2;
+    listen [::]:2096 ssl http2;
+    listen 8443 ssl http2;
+    listen [::]:8443 ssl http2;
+
+    server_name *.$domain;
+    ssl_certificate /etc/xray/xray.crt;
+    ssl_certificate_key /etc/xray/xray.key;
+    ssl_ciphers EECDH+CHACHA20:EECDH+CHACHA20-draft:EECDH+ECDSA+AES128:EECDH+aRSA+AES128:RSA+AES128:EECDH+ECDSA+AES256:EECDH+aRSA+AES256:RSA+AES256:EECDH+ECDSA+3DES:EECDH+aRSA+3DES:RSA+3DES:!MD5;
+    ssl_protocols TLSv1.1 TLSv1.2 TLSv1.3;
+    root /home/vps/public_html;
+}
 EOF
 sed -i '$ ilocation = /vless' /etc/nginx/conf.d/xray.conf
 sed -i '$ i{' /etc/nginx/conf.d/xray.conf
