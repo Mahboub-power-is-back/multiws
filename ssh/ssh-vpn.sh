@@ -317,7 +317,41 @@ iptables-save > /etc/iptables.up.rules
 iptables-restore -t < /etc/iptables.up.rules
 netfilter-persistent save
 netfilter-persistent reload
+#install udp
+mkdir -p /root/udp
+cd /root/udp
+wget https://raw.githubusercontent.com/Mahboub-power-is-back/update244/main/udp-custom-linux-amd64
+chmod +x /root/udp/udp-custom-linux-amd64
+sudo cat > /etc/systemd/system/udpcustom.service <<'EOF'
+[Unit]
+Description=UDP Custom by ePro Dev. Team
+After=network.target
 
+[Service]
+User=root
+Type=simple
+ExecStart=/root/udp/udp-custom-linux-amd64 server
+WorkingDirectory=/root/udp/
+Restart=always
+RestartSec=2s
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo cat > /root/udp/config.json <<'EOF'
+{
+  "listen": ":36712",
+  "stream_buffer": 33554432,
+  "receive_buffer": 83886080,
+  "auth": {
+    "mode": "passwords"
+  }
+}
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable udpcustom.service
+sudo systemctl start udpcustom.service
 # download script
 cd /usr/bin
 # menu
