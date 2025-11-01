@@ -1,23 +1,50 @@
-#!/usr/bin/env bash
-#
-# Fixed full installer script (cleaned, safer prompts, color escapes fixed)
-# Keep the original reminders / banner text at the top
-#
-# NOTE: run as root (script checks automatically)
+#!/bin/bash
 
-# ------------------------------------------------------------------
-# Reminders from original
-# ------------------------------------------------------------------
-echo ""
-echo "=================================================================="
-echo "    cari apa..?? harta tahta hanya sementara ingat masih ada kehidupan setelah kematian"
-echo "    jangan lupa sholat ingat ajal menantimu"
-echo "    dibawah ini bukan cd kaset ya"
-echo ""
+# Config
+KEY_DB="/etc/myvpn/keys.db"   # Same DB used by your bot
 
-# ------------------------------------------------------------------
-# Cleanup old setup file (if any) and chdir root
-# ------------------------------------------------------------------
+# Function to check key
+check_key() {
+    local USER_KEY="$1"
+    # Look for key in DB
+    LINE=$(grep -E "^$USER_KEY\|" "$KEY_DB" || true)
+    if [ -z "$LINE" ]; then
+        return 1   # Key not found
+    fi
+    KEY=$(echo "$LINE" | cut -d'|' -f1)
+    IP=$(echo "$LINE" | cut -d'|' -f2)
+    EXP=$(echo "$LINE" | cut -d'|' -f3)
+    # Check expiration
+    if [[ $(date -d "$EXP" +%s) -lt $(date +%s) ]]; then
+        return 2   # Key expired
+    fi
+    return 0      # Valid key
+}
+
+# Ask user for key
+read -p "Enter your license key: " USER_KEY
+
+# Verify
+check_key "$USER_KEY"
+RESULT=$?
+
+if [ $RESULT -eq 0 ]; then
+    echo "✅ Key is valid. Access granted."
+    # Optional: restrict by IP
+    USER_IP=$(curl -s ifconfig.me)
+    KEY_IP=$(grep -E "^$USER_KEY\|" "$KEY_DB" | cut -d'|' -f2)
+    if [ "$USER_IP" != "$KEY_IP" ]; then
+        echo "❌ This key is bound to IP $KEY_IP. Your IP: $USER_IP"
+        exit 1
+    fi
+    # Continue script here...
+elif [ $RESULT -eq 1 ]; then
+    echo "❌ Invalid key. Access denied."
+    exit 1
+elif [ $RESULT -eq 2 ]; then
+    echo "❌ Key expired. Contact admin for renewal."
+    exit 1
+fi
 cd /root || exit 1
 rm -f setup.sh >/dev/null 2>&1
 clear
