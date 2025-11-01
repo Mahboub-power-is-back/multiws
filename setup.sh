@@ -23,28 +23,23 @@ check_key() {
 
 # Ask user for key
 read -p "Enter your license key: " USER_KEY
-
-# Verify
 check_key "$USER_KEY"
 RESULT=$?
 
-if [ $RESULT -eq 0 ]; then
-    echo "✅ Key is valid. Access granted."
-    # Optional: restrict by IP
-    USER_IP=$(curl -s ifconfig.me)
-    KEY_IP=$(grep -E "^$USER_KEY\|" "$KEY_DB" | cut -d'|' -f2)
-    if [ "$USER_IP" != "$KEY_IP" ]; then
-        echo "❌ This key is bound to IP $KEY_IP. Your IP: $USER_IP"
-        exit 1
-    fi
-    # Continue script here...
-elif [ $RESULT -eq 1 ]; then
-    echo "❌ Invalid key. Access denied."
-    exit 1
-elif [ $RESULT -eq 2 ]; then
-    echo "❌ Key expired. Contact admin for renewal."
+if [ $RESULT -ne 0 ]; then
+    echo "❌ Key invalid or expired. Exiting..."
+    sleep 3
     exit 1
 fi
+
+echo "✅ Key valid. Access granted! Continuing installation..."
+sleep 1
+
+# --- Continue installation here ---
+# Example:
+# bash /root/ssh-vpn.sh
+# bash /root/ins-xray.sh
+# bash /root/insshws.sh
 cd /root || exit 1
 rm -f setup.sh >/dev/null 2>&1
 clear
