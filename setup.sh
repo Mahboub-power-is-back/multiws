@@ -6,17 +6,12 @@
 print_logo() {
 cat << "EOF"
 ==================================================================
-      ___                                    ___         ___      
-     /  /\        ___           ___         /  /\       /__/\     
-    /  /:/_      /  /\         /__/\       /  /::\      \  \:\    
-   /  /:/ /\    /  /:/         \  \:\     /  /:/\:\      \  \:\   
-  /  /:/_/::\  /__/::\          \  \:\   /  /:/~/:/  _____\__\:\  
- /__/:/__\/\:\ \__\/\:\__   ___  \__\:\ /__/:/ /:/  /__/::::::::\ 
- \  \:\ /~~/:/    \  \:\/\ /__/\ |  |:| \  \:\/:/   \  \:\~~\~~\/ 
-  \  \:\  /:/      \__\::/ \  \:\|  |:|  \  \::/     \  \:\  ~~~  
-   \  \:\/:/       /__/:/   \  \:\__|:|   \  \:\      \  \:\      
-    \  \::/        \__\/     \__\::::/     \  \:\      \  \:\     
-     \__\/                       ~~~~       \__\/       \__\/ 1.0
+ __  __       _    _     _    _    ____  ____  ____  
+|  \/  | __ _| | _| |__ | | _| |  |  _ \/ ___|| __ ) 
+| |\/| |/ _` | |/ / '_ \| |/ / |  | | | \___ \|  _ \
+| |  | | (_| |   <| | | |   <| |__| |_| |___) | |_) |
+|_|  |_|\__,_|_|\_\_| |_|_|\_\____|____/|____/|____/ 
+                                                      
 ==================================================================
 EOF
 }
@@ -74,12 +69,12 @@ run_with_progress "wget -q https://raw.githubusercontent.com/Mahboub-power-is-ba
 run_with_progress "wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/xray/ins-xray.sh -O /root/ins-xray.sh && chmod +x /root/ins-xray.sh && bash /root/ins-xray.sh" "Installing Xray"
 
 # -----------------------------
-# SSH over WS
+# SSH over WS Installation
 # -----------------------------
 run_with_progress "wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/sshws/insshws.sh -O /root/insshws.sh && chmod +x /root/insshws.sh && bash /root/insshws.sh" "Installing SSH over WebSocket"
 
 # -----------------------------
-# Domain Setup Example
+# Domain Setup
 # -----------------------------
 read -rp "Enter your domain (or leave empty for random): " dom
 if [ -z "$dom" ]; then
@@ -102,6 +97,7 @@ cat >> "$LOG" << EOF
 - SSH SSL Websocket        : 443
 - Stunnel4                 : 222, 777
 - Dropbear                 : 109, 143
+- UDPCUSTOM                : 1-65535
 - Badvpn                   : 7100-7900
 - Nginx                    : 81
 - Vmess WS TLS             : 443
@@ -120,7 +116,7 @@ cat >> "$LOG" << EOF
 EOF
 
 # -----------------------------
-# CLEAN UP
+# CLEAN UP TEMP FILES
 # -----------------------------
 run_with_progress "rm -f /root/ssh-vpn.sh /root/ins-xray.sh /root/insshws.sh" "Cleaning up temporary files"
 
