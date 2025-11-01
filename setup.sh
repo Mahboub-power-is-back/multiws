@@ -1,44 +1,83 @@
 #!/bin/bash
 
 # -----------------------------
-# MAHBOUB LOGO
+# RED MAHBOUB LOGO
 # -----------------------------
 print_logo() {
-cat << "EOF"
+echo -e "\e[31m
 ==================================================================
  __  __       _    _     _    _    ____  ____  ____  
 |  \/  | __ _| | _| |__ | | _| |  |  _ \/ ___|| __ ) 
-| |\/| |/ _` | |/ / '_ \| |/ / |  | | | \___ \|  _ \
+| |\/| |/ _\` | |/ / '_ \| |/ / |  | | | \___ \|  _ \\
 | |  | | (_| |   <| | | |   <| |__| |_| |___) | |_) |
 |_|  |_|\__,_|_|\_\_| |_|_|\_\____|____/|____/|____/ 
                                                       
 ==================================================================
-EOF
+\e[0m"
 }
 
 # -----------------------------
-# BLOCK PROGRESS BAR FUNCTION
+# RUN COMMAND WITH REAL-TIME PROGRESS
 # -----------------------------
-progress_bar() {
-    local msg="$1"
-    local duration=${2:-2}   # Default duration 2 seconds
-    local steps=24           # Number of blocks
-    printf "%s... " "$msg"
-    for i in $(seq 1 $steps); do
-        printf "█"
-        sleep $(echo "$duration/$steps" | bc -l)
-    done
-    printf " Done\n"
-}
-
-# -----------------------------
-# RUN COMMAND WITH PROGRESS
-# -----------------------------
-run_with_progress() {
+run_cmd() {
     local cmd="$1"
     local msg="$2"
-    progress_bar "$msg" 1
-    bash -c "$cmd" &>/dev/null
+    printf "%s " "$msg"
+
+    $cmd &>/dev/null &
+    cmd_pid=$!
+
+    while kill -0 $cmd_pid 2>/dev/null; do
+        printf "█"
+        sleep 0.08
+    done
+
+    wait $cmd_pid
+    printf " OK\n"
+}
+
+# -----------------------------
+# DOMAIN CONFIGURATION
+# -----------------------------
+configure_domain() {
+printf "┌─────────────────────────────┐\n"
+printf "│   DOMAIN CONFIGURATION MENU │\n"
+printf "└─────────────────────────────┘\n"
+printf "  [1] Use Random Domain (Cloudflare)\n"
+printf "  [2] Use Your Own Domain\n"
+printf "Select option (1/2): "
+read -r dns
+
+case "$dns" in
+  1)
+    mkdir -p /root/scripts
+    CF_URL="https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/cf"
+    wget -q -O /root/scripts/cf "$CF_URL"
+    dos2unix /root/scripts/cf >/dev/null 2>&1
+    chmod +x /root/scripts/cf
+    run_cmd "bash /root/scripts/cf" "[CF] Generating Domain"
+    DOMAIN=$(cat /root/domain)
+    ;;
+  2)
+    read -rp "Enter your domain: " DOMAIN
+    if [ -z "$DOMAIN" ]; then
+        echo "[ERROR] Empty domain. Exiting."
+        exit 1
+    fi
+    ;;
+  *)
+    echo "[ERROR] Invalid selection. Exiting."
+    exit 1
+    ;;
+esac
+
+# Save domain to configs
+echo "IP=$DOMAIN" > /var/lib/ipvps.conf
+echo "$DOMAIN" > /root/scdomain
+echo "$DOMAIN" > /etc/xray/scdomain
+echo "$DOMAIN" > /etc/xray/domain
+echo "$DOMAIN" > /etc/v2ray/domain
+echo "$DOMAIN" > /root/domain
 }
 
 # -----------------------------
@@ -46,82 +85,64 @@ run_with_progress() {
 # -----------------------------
 clear
 print_logo
-sleep 1
+sleep 0.5
 
-# Create log file
+configure_domain
+
 LOG="/root/log-install.txt"
 > "$LOG"
 
 # -----------------------------
 # SYSTEM UPDATE & DEPENDENCIES
 # -----------------------------
-run_with_progress "apt update -y && apt upgrade -y" "Updating system"
-run_with_progress "apt install -y git curl wget python dos2unix" "Installing dependencies"
+run_cmd "apt update -y && apt upgrade -y" "[SYS] Updating System"
+run_cmd "apt install -y git curl wget python dos2unix" "[SYS] Installing Dependencies"
 
 # -----------------------------
-# SSH WebSocket Installation
+# INSTALL SSH, Xray, SSH-WS
 # -----------------------------
-run_with_progress "wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/ssh-vpn.sh -O /root/ssh-vpn.sh && chmod +x /root/ssh-vpn.sh && bash /root/ssh-vpn.sh" "Installing SSH WebSocket"
+run_cmd "wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/ssh-vpn.sh -O /root/ssh-vpn.sh && chmod +x /root/ssh-vpn.sh && bash /root/ssh-vpn.sh" "[SSH] Installing SSH WebSocket"
+run_cmd "wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/xray/ins-xray.sh -O /root/ins-xray.sh && chmod +x /root/ins-xray.sh && bash /root/ins-xray.sh" "[XRAY] Installing Xray"
+run_cmd "wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/sshws/insshws.sh -O /root/insshws.sh && chmod +x /root/insshws.sh && bash /root/insshws.sh" "[WS] Installing SSH over WebSocket"
 
 # -----------------------------
-# Xray Installation
+# CLEANUP TEMP FILES
 # -----------------------------
-run_with_progress "wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/xray/ins-xray.sh -O /root/ins-xray.sh && chmod +x /root/ins-xray.sh && bash /root/ins-xray.sh" "Installing Xray"
-
-# -----------------------------
-# SSH over WS Installation
-# -----------------------------
-run_with_progress "wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/sshws/insshws.sh -O /root/insshws.sh && chmod +x /root/insshws.sh && bash /root/insshws.sh" "Installing SSH over WebSocket"
-
-# -----------------------------
-# Domain Setup
-# -----------------------------
-read -rp "Enter your domain (or leave empty for random): " dom
-if [ -z "$dom" ]; then
-    dom="random-domain.com"
-fi
-echo "IP=$dom" > /var/lib/ipvps.conf
-echo "$dom" > /root/scdomain
-echo "$dom" > /etc/xray/scdomain
-echo "$dom" > /etc/xray/domain
-echo "$dom" > /etc/v2ray/domain
-echo "$dom" > /root/domain
+run_cmd "rm -f /root/ssh-vpn.sh /root/ins-xray.sh /root/insshws.sh" "[CLEAN] Removing temporary files"
 
 # -----------------------------
 # LOG SERVICE PORTS
 # -----------------------------
-cat >> "$LOG" << EOF
+cat > "$LOG" << EOF
 ===================== SERVICES & PORTS =====================
-- OpenSSH                  : 22
-- SSH Websocket            : 80
-- SSH SSL Websocket        : 443
-- Stunnel4                 : 222, 777
-- Dropbear                 : 109, 143
-- UDPCUSTOM                : 1-65535
-- Badvpn                   : 7100-7900
-- Nginx                    : 81
-- Vmess WS TLS             : 443
-- Vless WS TLS             : 443
-- Trojan WS TLS            : 443
-- Shadowsocks WS TLS       : 443
-- Vmess WS none TLS        : 80
-- Vless WS none TLS        : 80
-- Trojan WS none TLS       : 80
-- Shadowsocks WS none TLS  : 80
-- Vmess gRPC               : 443
-- Vless gRPC               : 443
-- Trojan gRPC              : 443
-- Shadowsocks gRPC         : 443
+Domain / Hostname : $DOMAIN
+OpenSSH           : 22
+SSH WebSocket     : 80
+SSH SSL WebSocket : 443
+Dropbear          : 109, 143
+Stunnel4          : 222, 777
+Badvpn            : 7100-7900
+Nginx             : 81
+Vmess WS TLS      : 443
+Vless WS TLS      : 443
+Trojan WS TLS     : 443
+Shadowsocks WS TLS: 443
+Vmess WS non TLS  : 80
+Vless WS non TLS  : 80
+Trojan WS non TLS : 80
+Shadowsocks WS non TLS: 80
+Vmess gRPC        : 443
+Vless gRPC        : 443
+Trojan gRPC       : 443
+Shadowsocks gRPC  : 443
 ============================================================
 EOF
 
 # -----------------------------
-# CLEAN UP TEMP FILES
-# -----------------------------
-run_with_progress "rm -f /root/ssh-vpn.sh /root/ins-xray.sh /root/insshws.sh" "Cleaning up temporary files"
-
-# -----------------------------
 # FINISHED
 # -----------------------------
-echo -e "\nAll installations completed!"
-echo "Check installed service ports in $LOG"
+clear
+print_logo
+echo -e "\e[32mINSTALLATION COMPLETE!\e[0m"
+echo "Service ports logged → $LOG"
+echo -e "Domain Used → \e[32m$DOMAIN\e[0m"
