@@ -1,31 +1,29 @@
 #!/bin/bash
 
 # -----------------------------
-# MAHBOUB RED LOGO
+# MAHBOUB LOGO
 # -----------------------------
 print_logo() {
-RED='\033[0;31m'
-NC='\033[0m'
-cat << EOF
-${RED}==================================================================
+cat << "EOF"
+==================================================================
  __  __       _    _     _    _    ____  ____  ____  
 |  \/  | __ _| | _| |__ | | _| |  |  _ \/ ___|| __ ) 
-| |\/| |/ _\` | |/ / '_ \| |/ / |  | | | \___ \|  _ \
+| |\/| |/ _` | |/ / '_ \| |/ / |  | | | \___ \|  _ \
 | |  | | (_| |   <| | | |   <| |__| |_| |___) | |_) |
 |_|  |_|\__,_|_|\_\_| |_|_|\_\____|____/|____/|____/ 
                                                       
-==================================================================${NC}
+==================================================================
 EOF
 }
 
 # -----------------------------
-# PROGRESS BAR
+# BLOCK PROGRESS BAR FUNCTION
 # -----------------------------
 progress_bar() {
     local msg="$1"
-    local steps=24
-    local duration=${2:-1}
-    printf "%s... " "$msg"
+    local duration=${2:-1}   # Default duration 1 second
+    local steps=24           # Number of blocks
+    printf "%s " "$msg"
     for i in $(seq 1 $steps); do
         printf "█"
         sleep $(echo "$duration/$steps" | bc -l)
@@ -39,15 +37,17 @@ progress_bar() {
 run_with_progress() {
     local cmd="$1"
     local msg="$2"
-    progress_bar "$msg"
+    progress_bar "$msg" 1
     bash -c "$cmd" &>/dev/null
 }
 
 # -----------------------------
-# DOMAIN SETUP FIRST
+# DOMAIN CONFIGURATION FIRST
 # -----------------------------
 clear
 print_logo
+sleep 1
+
 printf "┌─────────────────────────────┐\n"
 printf "│   DOMAIN CONFIGURATION MENU │\n"
 printf "└─────────────────────────────┘\n"
@@ -60,7 +60,10 @@ case "$dns" in
   1)
     mkdir -p /root/scripts
     CF_URL="https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/cf"
-    run_with_progress "wget -q -O /root/scripts/cf $CF_URL && dos2unix /root/scripts/cf && chmod +x /root/scripts/cf && bash /root/scripts/cf" "Setting Random Domain via Cloudflare"
+    wget -q -O /root/scripts/cf "$CF_URL"
+    dos2unix /root/scripts/cf >/dev/null 2>&1
+    chmod +x /root/scripts/cf
+    bash /root/scripts/cf || { echo "[ERROR] Cloudflare script failed"; exit 1; }
     ;;
   2)
     printf "Enter your domain: "
@@ -69,12 +72,6 @@ case "$dns" in
         echo "[ERROR] Empty domain. Exiting."
         exit 1
     fi
-    echo "IP=$dom" > /var/lib/ipvps.conf
-    echo "$dom" > /root/scdomain
-    echo "$dom" > /etc/xray/scdomain
-    echo "$dom" > /etc/xray/domain
-    echo "$dom" > /etc/v2ray/domain
-    echo "$dom" > /root/domain
     ;;
   *)
     echo "[ERROR] Invalid selection. Exiting."
@@ -82,32 +79,31 @@ case "$dns" in
     ;;
 esac
 
+# Ensure directories exist
+mkdir -p /etc/xray /etc/v2ray
+
+# Save domain configuration
+echo "IP=$dom" > /var/lib/ipvps.conf
+echo "$dom" > /root/scdomain
+echo "$dom" > /etc/xray/scdomain
+echo "$dom" > /etc/xray/domain
+echo "$dom" > /etc/v2ray/domain
+echo "$dom" > /root/domain
+
 # -----------------------------
-# CREATE LOG FILE
+# START INSTALLATION
 # -----------------------------
 LOG="/root/log-install.txt"
 > "$LOG"
 
-# -----------------------------
-# SYSTEM UPDATE & DEPENDENCIES
-# -----------------------------
-run_with_progress "apt update -y && apt upgrade -y" "Updating system"
-run_with_progress "apt install -y git curl wget python3 dos2unix" "Installing dependencies"
+run_with_progress "apt update -y && apt upgrade -y" "[SYS] Updating System"
+run_with_progress "apt install -y git curl wget python dos2unix" "[SYS] Installing Dependencies"
 
-# -----------------------------
-# SSH WebSocket Installation
-# -----------------------------
-run_with_progress "wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/ssh-vpn.sh -O /root/ssh-vpn.sh && chmod +x /root/ssh-vpn.sh && bash /root/ssh-vpn.sh" "Installing SSH WebSocket"
+run_with_progress "wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/ssh-vpn.sh -O /root/ssh-vpn.sh && chmod +x /root/ssh-vpn.sh && bash /root/ssh-vpn.sh" "[SSH] Installing SSH WebSocket"
 
-# -----------------------------
-# Xray Installation
-# -----------------------------
-run_with_progress "wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/xray/ins-xray.sh -O /root/ins-xray.sh && chmod +x /root/ins-xray.sh && bash /root/ins-xray.sh" "Installing Xray"
+run_with_progress "wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/xray/ins-xray.sh -O /root/ins-xray.sh && chmod +x /root/ins-xray.sh && bash /root/ins-xray.sh" "[XRAY] Installing Xray"
 
-# -----------------------------
-# SSH over WS Installation
-# -----------------------------
-run_with_progress "wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/sshws/insshws.sh -O /root/insshws.sh && chmod +x /root/insshws.sh && bash /root/insshws.sh" "Installing SSH over WebSocket"
+run_with_progress "wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/sshws/insshws.sh -O /root/insshws.sh && chmod +x /root/insshws.sh && bash /root/insshws.sh" "[SSH-WS] Installing SSH over WebSocket"
 
 # -----------------------------
 # LOG SERVICE PORTS
@@ -139,7 +135,7 @@ EOF
 # -----------------------------
 # CLEAN UP TEMP FILES
 # -----------------------------
-run_with_progress "rm -f /root/ssh-vpn.sh /root/ins-xray.sh /root/insshws.sh" "Cleaning up temporary files"
+run_with_progress "rm -f /root/ssh-vpn.sh /root/ins-xray.sh /root/insshws.sh /root/scripts/cf" "[CLEAN] Cleaning temporary files"
 
 # -----------------------------
 # FINISHED
