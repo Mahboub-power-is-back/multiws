@@ -1,46 +1,35 @@
 #!/bin/bash
 
-# Config
-KEY_DB="/etc/myvpn/keys.db"   # Same DB used by your bot
+KEY_DB="/root/keys.db"  # copy from bot VPS via scp if needed
 
-# Function to check key
-check_key() {
-    local USER_KEY="$1"
-    # Look for key in DB
-    LINE=$(grep -E "^$USER_KEY\|" "$KEY_DB" || true)
-    if [ -z "$LINE" ]; then
-        return 1   # Key not found
-    fi
-    KEY=$(echo "$LINE" | cut -d'|' -f1)
-    IP=$(echo "$LINE" | cut -d'|' -f2)
-    EXP=$(echo "$LINE" | cut -d'|' -f3)
-    # Check expiration
-    if [[ $(date -d "$EXP" +%s) -lt $(date +%s) ]]; then
-        return 2   # Key expired
-    fi
-    return 0      # Valid key
-}
-
-# Ask user for key
 read -p "Enter your license key: " USER_KEY
-check_key "$USER_KEY"
-RESULT=$?
 
-if [ $RESULT -ne 0 ]; then
-    echo "❌ Key invalid or expired. Exiting..."
-    sleep 3
+# Lookup key
+LINE=$(grep -E "^$USER_KEY\|" "$KEY_DB" || true)
+if [ -z "$LINE" ]; then
+    echo "❌ Invalid key. Installation aborted."
     exit 1
 fi
 
-echo "✅ Key valid. Access granted! Continuing installation..."
-sleep 1
+KEY=$(echo "$LINE" | cut -d'|' -f1)
+IP=$(echo "$LINE" | cut -d'|' -f2)
+EXP=$(echo "$LINE" | cut -d'|' -f3)
 
-# --- Continue installation here ---
-# Example:
-# bash /root/ssh-vpn.sh
-# bash /root/ins-xray.sh
-# bash /root/insshws.sh
-cd /root || exit 1
+# Check expiration
+if [[ $(date -d "$EXP" +%s) -lt $(date +%s) ]]; then
+    echo "❌ Key expired. Contact admin for renewal."
+    exit 1
+fi
+
+# Optional: restrict by IP
+USER_IP=$(curl -s ifconfig.me)
+if [ "$USER_IP" != "$IP" ]; then
+    echo "❌ This key is bound to IP $IP. Your IP: $USER_IP"
+    exit 1
+fi
+
+echo "✅ Key valid. Proceeding with installation..."
+cd /root ||
 rm -f setup.sh >/dev/null 2>&1
 clear
 
