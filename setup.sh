@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================
-# MAHBOUB INSTALLATION SCRIPT - FIXED VERSION
+# MULTIPLUS INSTALLATION SCRIPT - FIXED VERSION
 # =============================
 
 # ----------------------------- COLORS -----------------------------
@@ -29,82 +29,103 @@ DOMAIN_SCRIPT="$GITHUB_BASE/ssh/cf"
 print_logo() {
 cat << "EOF"
 \033[0;31m==================================================================
- __  __       _    _     _    _    ____  ____  ____  
-|  \/  | __ _| | _| |__ | | _| |  |  _ \/ ___|| __ ) 
-| |\/| |/ _` | |/ / '_ \| |/ / |  | | | \___ \|  _ \ 
-| |  | | (_| |   <| | | |   <| |__| |_| |___) | |_) |
-|_|  |_|\__,_|_|\_\_| |_|_|\_\____|____/|____/|____/ 
+ __  __   _   _ _   _ ____  _      ____ _     _____ ____  
+|  \/  | | | | | | | |  _ \| |    / ___| |   | ____/ ___| 
+| |\/| | | | | | | | | |_) | |   | |   | |   |  _| \___ \ 
+| |  | | | |_| | |_| |  __/| |___| |___| |___| |___ ___) |
+|_|  |_|  \___/ \___/|_|   |_____|\____|_____|_____|____/ 
 ==================================================================\033[0m
 EOF
 }
 
-# ----------------------------- SPINNER -----------------------------
-run_spinner() {
-    local pid=$1
-    local msg="$2"
-    local spin=('|' '/' '-' '\')
-    local i=0
-    printf "%-40s " "$msg"
-    
-    while kill -0 "$pid" 2>/dev/null; do
-        printf "\b${spin:i++%4:1}"
-        sleep 0.1
-    done
-    
-    wait "$pid"
-    local exit_code=$?
-    
-    if [ $exit_code -eq 0 ]; then
-        printf "\b\033[32mOK\033[0m\n"
-    else
-        printf "\b\033[31mFAIL\033[0m\n"
-        return 1
-    fi
+# ----------------------------- SIMPLE PROGRESS -----------------------------
+show_progress() {
+    local msg="$1"
+    printf "%-40s" "$msg"
 }
 
-run_with_spinner() {
-    local cmd="$1"
-    local msg="$2"
-    
-    # Run command in background
-    eval "$cmd" >/root/lastlog.txt 2>&1 &
-    local pid=$!
-    
-    run_spinner "$pid" "$msg"
-    return $?
+show_success() {
+    printf "\033[32mOK\033[0m\n"
+}
+
+show_fail() {
+    printf "\033[31mFAIL\033[0m\n"
 }
 
 # ----------------------------- DOMAIN GENERATION -----------------------------
 generate_domain() {
     echo -e "${BGreen}[INFO] Generating domain...${NC}"
     
-    # Try external script first
+    # Try to download and use the domain script
+    show_progress "[DNS] Downloading domain script"
     if wget -q -O /root/cf "$DOMAIN_SCRIPT" && [ -f /root/cf ]; then
-        chmod +x /root/cf
-        ./cf
-        sleep 2
+        show_success
         
-        if [ -f /root/scdomain ] && [ -s /root/scdomain ]; then
-            dom=$(cat /root/scdomain)
-            echo -e "${BGreen}[SUCCESS] Domain generated: $dom${NC}"
-            echo "$dom"
-            return 0
+        # Check if the file has content
+        show_progress "[DNS] Setting up domain script"
+        if [ -s /root/cf ]; then
+            chmod +x /root/cf
+            show_success
+            
+            show_progress "[DNS] Generating domain"
+            # Run the domain script and capture output
+            if ./cf > /root/domain-generation.log 2>&1; then
+                # Check if domain was generated in any of the possible files
+                if [ -f /root/domain ] && [ -s /root/domain ]; then
+                    dom=$(cat /root/domain)
+                    show_success
+                    echo -e "${BGreen}[SUCCESS] Domain generated: $dom${NC}"
+                    echo "$dom"
+                    return 0
+                elif [ -f /root/scdomain ] && [ -s /root/scdomain ]; then
+                    dom=$(cat /root/scdomain)
+                    show_success
+                    echo -e "${BGreen}[SUCCESS] Domain generated: $dom${NC}"
+                    echo "$dom"
+                    return 0
+                else
+                    show_fail
+                    echo -e "${BYellow}[WARNING] Domain script ran but no domain file was created${NC}"
+                    # Check the log for errors
+                    if [ -f /root/domain-generation.log ]; then
+                        echo -e "${BYellow}[DEBUG] Domain script output:${NC}"
+                        tail -n 10 /root/domain-generation.log
+                    fi
+                fi
+            else
+                show_fail
+                echo -e "${BYellow}[WARNING] Domain script execution failed${NC}"
+                if [ -f /root/domain-generation.log ]; then
+                    echo -e "${BYellow}[DEBUG] Domain script error:${NC}"
+                    tail -n 10 /root/domain-generation.log
+                fi
+            fi
+        else
+            show_fail
+            echo -e "${BYellow}[WARNING] Downloaded domain script is empty${NC}"
         fi
+    else
+        show_fail
+        echo -e "${BYellow}[WARNING] Failed to download domain script from: $DOMAIN_SCRIPT${NC}"
     fi
     
     # Fallback: direct domain generation
     echo -e "${BYellow}[INFO] Using fallback domain generation...${NC}"
-    local random_str=$(head /dev/urandom | tr -dc a-z0-9 | head -c 6)
-    local domains=("xray.cf" "mlcdn.cloud" "servehttp.com" "pages.dev")
-    local selected_domain=${domains[$RANDOM % ${#domains[@]}]}
-    local generated_domain="${random_str}.${selected_domain}"
+    show_progress "[DNS] Generating random domain"
     
+    # Generate random string
+    local random_str=$(head /dev/urandom | tr -dc a-z0-9 | head -c 8)
+    local generated_domain="asx-${random_str}.mahboubvps.site"
+    
+    # Save domain to all required files
     echo "$generated_domain" > /root/scdomain
     echo "$generated_domain" > /etc/xray/domain
     echo "$generated_domain" > /etc/v2ray/domain
     echo "$generated_domain" > /root/domain
+    echo "IP=$generated_domain" > /var/lib/ipvps.conf
     
-    echo -e "${BGreen}[SUCCESS] Domain generated: $generated_domain${NC}"
+    show_success
+    echo -e "${BGreen}[SUCCESS] Fallback domain generated: $generated_domain${NC}"
     echo "$generated_domain"
 }
 
@@ -129,66 +150,38 @@ check_os() {
     fi
 }
 
-# ----------------------------- FAST INSTALLATION FUNCTIONS -----------------------------
-install_ssh_websocket() {
-    echo -e "${BGreen}[INFO] Installing SSH WebSocket...${NC}"
+# ----------------------------- INSTALLATION FUNCTIONS -----------------------------
+download_and_install() {
+    local url="$1"
+    local filename="$2"
+    local service_name="$3"
     
-    if wget -q "$SSH_SCRIPT" -O /root/ssh-vpn.sh && [ -f /root/ssh-vpn.sh ]; then
-        chmod +x /root/ssh-vpn.sh
-        # Run in background
-        bash /root/ssh-vpn.sh > /root/ssh-install.log 2>&1 &
-        local ssh_pid=$!
+    show_progress "[$service_name] Downloading"
+    if wget -q "$url" -O "/root/$filename" && [ -f "/root/$filename" ]; then
+        show_success
         
-        # Wait for completion
-        wait $ssh_pid
+        show_progress "[$service_name] Installing"
+        chmod +x "/root/$filename"
         
-        if [ $? -eq 0 ]; then
-            echo -e "${BGreen}[SUCCESS] SSH WebSocket installed${NC}"
+        # Run the installation script
+        if bash "/root/$filename" > "/root/${service_name}-install.log" 2>&1; then
+            show_success
+            echo -e "  ${BGreen}✓${NC} $service_name installed successfully"
+            return 0
         else
-            echo -e "${BYellow}[WARNING] SSH WebSocket installation had issues${NC}"
+            show_fail
+            echo -e "  ${BYellow}⚠${NC} $service_name installation had issues"
+            # Show last few lines of log for debugging
+            if [ -f "/root/${service_name}-install.log" ]; then
+                echo -e "  ${BYellow}[DEBUG] Last 5 lines of log:${NC}"
+                tail -n 5 "/root/${service_name}-install.log"
+            fi
+            return 1
         fi
     else
-        echo -e "${red}[ERROR] Failed to download SSH WebSocket from: $SSH_SCRIPT${NC}"
-    fi
-}
-
-install_xray() {
-    echo -e "${BGreen}[INFO] Installing Xray...${NC}"
-    
-    if wget -q "$XRAY_SCRIPT" -O /root/ins-xray.sh && [ -f /root/ins-xray.sh ]; then
-        chmod +x /root/ins-xray.sh
-        bash /root/ins-xray.sh > /root/xray-install.log 2>&1 &
-        local xray_pid=$!
-        
-        wait $xray_pid
-        
-        if [ $? -eq 0 ]; then
-            echo -e "${BGreen}[SUCCESS] Xray installed${NC}"
-        else
-            echo -e "${BYellow}[WARNING] Xray installation had issues${NC}"
-        fi
-    else
-        echo -e "${red}[ERROR] Failed to download Xray from: $XRAY_SCRIPT${NC}"
-    fi
-}
-
-install_sshws() {
-    echo -e "${BGreen}[INFO] Installing SSHWS...${NC}"
-    
-    if wget -q "$SSHWS_SCRIPT" -O /root/insshws.sh && [ -f /root/insshws.sh ]; then
-        chmod +x /root/insshws.sh
-        bash /root/insshws.sh > /root/sshws-install.log 2>&1 &
-        local sshws_pid=$!
-        
-        wait $sshws_pid
-        
-        if [ $? -eq 0 ]; then
-            echo -e "${BGreen}[SUCCESS] SSHWS installed${NC}"
-        else
-            echo -e "${BYellow}[WARNING] SSHWS installation had issues${NC}"
-        fi
-    else
-        echo -e "${red}[ERROR] Failed to download SSHWS from: $SSHWS_SCRIPT${NC}"
+        show_fail
+        echo -e "  ${red}✗${NC} Failed to download $service_name from: $url"
+        return 1
     fi
 }
 
@@ -206,9 +199,11 @@ LOG="/root/log-install.txt"
 
 mkdir -p /etc/xray /etc/v2ray
 
+echo -e "${BGreen}[INFO] Starting installation...${NC}"
+
 # ----------------------------- DOMAIN SETUP -----------------------------
 echo -e "${BBlue}================ SETUP DOMAIN VPS ================${NC}"
-echo -e "${BYellow}1. Random Domain${NC}"
+echo -e "${BYellow}1. Random Domain (Cloudflare)${NC}"
 echo -e "${BYellow}2. Enter Your Own Domain${NC}"
 read -rp "Choose 1 or 2: " dns
 
@@ -228,10 +223,13 @@ elif [ "$dns" == "2" ]; then
     fi
     
     # Save domain to files
+    show_progress "[DNS] Saving domain"
     echo "$domain" > /root/scdomain
     echo "$domain" > /etc/xray/domain
     echo "$domain" > /etc/v2ray/domain
     echo "$domain" > /root/domain
+    echo "IP=$domain" > /var/lib/ipvps.conf
+    show_success
     echo -e "${BGreen}[SUCCESS] Domain set to: $domain${NC}"
 else
     echo -e "${red}[ERROR] Invalid choice!${NC}"
@@ -239,28 +237,36 @@ else
 fi
 
 # ----------------------------- SYSTEM UPDATE -----------------------------
-echo -e "${BGreen}[INFO] Updating system packages...${NC}"
-apt update -y > /dev/null 2>&1
-apt upgrade -y > /dev/null 2>&1
-echo -e "${BGreen}[SUCCESS] System updated${NC}"
+show_progress "[SYS] Updating system"
+if apt update -y > /dev/null 2>&1 && apt upgrade -y > /dev/null 2>&1; then
+    show_success
+else
+    show_fail
+    echo -e "${BYellow}[WARNING] System update had issues, but continuing...${NC}"
+fi
 
 # ----------------------------- INSTALL DEPENDENCIES -----------------------------
-echo -e "${BGreen}[INFO] Installing dependencies...${NC}"
-apt install -y git curl wget python3 dos2unix bc net-tools > /dev/null 2>&1
-echo -e "${BGreen}[SUCCESS] Dependencies installed${NC}"
+show_progress "[SYS] Installing dependencies"
+if apt install -y git curl wget python3 dos2unix bc net-tools jq > /dev/null 2>&1; then
+    show_success
+else
+    show_fail
+    echo -e "${BYellow}[WARNING] Some dependencies failed to install, but continuing...${NC}"
+fi
 
 # ----------------------------- INSTALL SERVICES -----------------------------
 echo -e "${BBlue}================ INSTALLING SERVICES ================${NC}"
 
-# Install services in sequence with better feedback
-install_ssh_websocket
-install_xray
-install_sshws
+# Install services in sequence
+download_and_install "$SSH_SCRIPT" "ssh-vpn.sh" "SSH"
+download_and_install "$XRAY_SCRIPT" "ins-xray.sh" "XRAY" 
+download_and_install "$SSHWS_SCRIPT" "insshws.sh" "SSHWS"
 
 # ----------------------------- FINAL SETUP -----------------------------
 echo -e "${BGreen}[INFO] Finalizing installation...${NC}"
 
 # Create profile
+show_progress "[SYS] Creating profile"
 cat > /root/.profile << END
 # ~/.profile: executed by Bourne-compatible login shells.
 
@@ -275,8 +281,11 @@ clear
 menu
 END
 chmod 644 /root/.profile
+show_success
 
 # Initialize log files
+show_progress "[SYS] Creating log files"
+mkdir -p /etc/xray /etc/v2ray
 touch /etc/log-create-ssh.log
 touch /etc/log-create-vmess.log
 touch /etc/log-create-vless.log
@@ -288,10 +297,12 @@ echo "Log Vmess Account " > /etc/log-create-vmess.log
 echo "Log Vless Account " > /etc/log-create-vless.log
 echo "Log Trojan Account " > /etc/log-create-trojan.log
 echo "Log Shadowsocks Account " > /etc/log-create-shadowsocks.log
+show_success
 
 # ----------------------------- CLEANUP -----------------------------
-echo -e "${BGreen}[INFO] Cleaning up...${NC}"
-rm -f /root/ins-xray.sh /root/ssh-vpn.sh /root/insshws.sh /root/cf > /dev/null 2>&1
+show_progress "[SYS] Cleaning up"
+rm -f /root/ins-xray.sh /root/ssh-vpn.sh /root/insshws.sh /root/cf /root/domain-generation.log > /dev/null 2>&1
+show_success
 
 # ----------------------------- SERVICE STATUS -----------------------------
 echo -e "${BBlue}================ SERVICE STATUS ================${NC}"
@@ -318,36 +329,4 @@ echo "Nginx                    : 81"
 echo "Vmess WS TLS             : 443"
 echo "Vless WS TLS             : 443"
 echo "Trojan WS TLS            : 443"
-echo "Shadowsocks WS TLS       : 443"
-echo "Vmess WS none TLS        : 80"
-echo "Vless WS none TLS        : 80"
-echo "Trojan WS none TLS       : 80"
-echo "Shadowsocks WS none TLS  : 80"
-echo "Vmess gRPC               : 443"
-echo "Vless gRPC               : 443"
-echo "Trojan gRPC              : 443"
-echo "Shadowsocks gRPC         : 443"
-echo "======================================================="
-echo "Domain                   : $domain"
-echo "Installation Log         : $LOG"
-echo "GitHub Repository        : https://github.com/Mahboub-power-is-back/multiws"
-} | tee -a "$LOG"
-
-# ----------------------------- COMPLETION -----------------------------
-echo -e "\n${BGreen}✅ INSTALLATION COMPLETED!${NC}"
-echo -e "${BBlue}===============================================${NC}"
-echo -e "${green}Your domain: $domain${NC}"
-echo -e "${green}Log file: $LOG${NC}"
-echo -e "${green}GitHub: https://github.com/Mahboub-power-is-back/multiws${NC}"
-echo -e "${yellow}Please reboot your server after installation${NC}"
-echo -e "${BBlue}===============================================${NC}"
-
-# Optional reboot
-echo -e "\n${BYellow}Do you want to reboot now? (y/n): ${NC}"
-read -r reboot_choice
-if [[ "$reboot_choice" == "y" || "$reboot_choice" == "Y" ]]; then
-    echo -e "${BGreen}[INFO] Rebooting system...${NC}"
-    reboot
-else
-    echo -e "${BGreen}[INFO] Installation complete. Please reboot manually when ready.${NC}"
-fi
+echo
