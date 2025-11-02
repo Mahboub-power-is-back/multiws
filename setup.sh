@@ -1,369 +1,99 @@
-The domain generation is failing because your domain script requires jq which isn't being installed. Let me fix just the domain generation part while keeping everything else the same:
-
-```bash
 #!/bin/bash
-# cari apa..?? harta tahta hanya sementara ingat masih ada kehidupan setelah kematian
-# jangan lupa sholat ingat ajal menantimu
-# dibawah ini bukan cd kaset ya
 cd
 rm -rf setup.sh
 clear
-red='\e[1;31m'
-green='\e[0;32m'
-yell='\e[1;33m'
-tyblue='\e[1;36m'
-BRed='\e[1;31m'
-BGreen='\e[1;32m'
-BYellow='\e[1;33m'
-BBlue='\e[1;34m'
-NC='\e[0m'
-purple() { echo -e "\\033[35;1m${*}\\033[0m"; }
-tyblue() { echo -e "\\033[36;1m${*}\\033[0m"; }
-yellow() { echo -e "\\033[33;1m${*}\\033[0m"; }
-green() { echo -e "\\033[32;1m${*}\\033[0m"; }
-red() { echo -e "\\033[31;1m${*}\\033[0m"; }
-cd /root
 
-# ----------------------------- SPINNER FUNCTION -----------------------------
+# Colors
+red='\e[1;31m'; green='\e[0;32m'; yell='\e[1;33m'; tyblue='\e[1;36m'
+BRed='\e[1;31m'; BGreen='\e[1;32m'; BYellow='\e[1;33m'; BBlue='\e[1;34m'; NC='\e[0m'
+
+purple() { echo -e "\\033[35;1m${*}\\033[0m"; }
+yellow() { echo -e "\\033[33;1m${*}\\033[0m"; }
+green()  { echo -e "\\033[32;1m${*}\\033[0m"; }
+red()    { echo -e "\\033[31;1m${*}\\033[0m"; }
+
 spinner() {
-    local pid=$1
-    local msg="$2"
-    local delay=0.1
-    local spinstr='|/-\'
-    printf "%-50s" "$msg"
-    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
-        local temp=${spinstr#?}
-        printf " [%c]  " "$spinstr"
-        local spinstr=$temp${spinstr%"$temp"}
-        sleep $delay
-        printf "\b\b\b\b\b\b"
+    local pid=$1 msg="$2" delay=0.1 spin='|/-\'
+    printf "%-40s" "$msg"
+    while ps -p $pid > /dev/null 2>&1; do
+        for i in {1..4}; do
+            printf " [%c] " "${spin:0:1}"
+            spin=${spin#?}${spin%${spin#?}}
+            sleep $delay
+            printf "\b\b\b\b\b"
+        done
     done
-    printf "    \b\b\b\b"
 }
 
 run_with_spinner() {
-    local cmd="$1"
-    local msg="$2"
-    eval "$cmd" > /dev/null 2>&1 &
-    local pid=$!
-    spinner $pid "$msg"
-    wait $pid
-    if [ $? -eq 0 ]; then
-        printf "\033[32m[OK]\033[0m\n"
-    else
-        printf "\033[31m[FAIL]\033[0m\n"
-        return 1
-    fi
+    local cmd="$1" msg="$2"
+    eval "$cmd" >/dev/null 2>&1 & pid=$!
+    spinner $pid "$msg"; wait $pid
+    [[ $? == 0 ]] && echo -e "\033[32m[OK]\033[0m" || echo -e "\033[31m[FAIL]\033[0m"
 }
 
-#System version number
-if [ "${EUID}" -ne 0 ]; then
-		echo "You need to run this script as root"
-  sleep 5
-		exit 1
-fi
-if [ "$(systemd-detect-virt)" == "openvz" ]; then
-		echo "OpenVZ is not supported"
-  clear
-                echo "For VPS with KVM and VMWare virtualization ONLY"
-  sleep 5
-		exit 1
-fi
+# ROOT CHECK
+[[ $EUID -ne 0 ]] && echo "Run as root" && exit
+[[ "$(systemd-detect-virt)" == "openvz" ]] && echo "OpenVZ not supported" && exit
 
-localip=$(hostname -I | cut -d\  -f1)
-hst=( `hostname` )
-dart=$(cat /etc/hosts | grep -w `hostname` | awk '{print $2}')
-if [[ "$hst" != "$dart" ]]; then
-echo "$localip $(hostname)" >> /etc/hosts
-fi
-# buat folder
-mkdir -p /etc/xray
-mkdir -p /etc/v2ray
-touch /etc/xray/domain
-touch /etc/v2ray/domain
-touch /etc/xray/scdomain
-touch /etc/v2ray/scdomain
+# Create folders
+mkdir -p /etc/xray /etc/v2ray
+touch /etc/xray/domain /etc/v2ray/domain /etc/xray/scdomain /etc/v2ray/scdomain
 
+# Install system deps
+run_with_spinner "apt update -y" "System Update"
+run_with_spinner "apt install git curl wget jq python3 -y" "Installing Dependencies"
+echo "IP=" >/var/lib/ipvps.conf
 
-echo -e "[ ${BBlue}NOTES${NC} ] Before we go.. "
-sleep 0.5
-echo -e "[ ${BBlue}NOTES${NC} ] I need check your headers first.."
-sleep 0.5
-echo -e "[ ${BGreen}INFO${NC} ] Checking headers"
-sleep 0.5
-totet=`uname -r`
-REQUIRED_PKG="linux-headers-$totet"
-PKG_OK=$(dpkg-query -W --showformat='${Status}\n' $REQUIRED_PKG|grep "install ok installed")
-echo Checking for $REQUIRED_PKG: $PKG_OK
-if [ "" = "$PKG_OK" ]; then
-  sleep 0.5
-  echo -e "[ ${BRed}WARNING${NC} ] Try to install ...."
-  echo "No $REQUIRED_PKG. Setting up $REQUIRED_PKG."
-  run_with_spinner "apt-get --yes install $REQUIRED_PKG" "Installing Linux Headers"
-  sleep 0.5
-  echo ""
-  sleep 0.5
-  echo -e "[ ${BBlue}NOTES${NC} ] If error you need.. to do this"
-  sleep 0.5
-  echo ""
-  sleep 0.5
-  echo -e "[ ${BBlue}NOTES${NC} ] apt update && apt upgrade -y && reboot"
-  sleep 0.5
-  echo ""
-  sleep 0.5
-  echo -e "[ ${BBlue}NOTES${NC} ] After this"
-  sleep 0.5
-  echo -e "[ ${BBlue}NOTES${NC} ] Then run this script again"
-  echo -e "[ ${BBlue}NOTES${NC} ] enter now"
-  read
-else
-  echo -e "[ ${BGreen}INFO${NC} ] Oke installed"
-fi
-
-ttet=`uname -r`
-ReqPKG="linux-headers-$ttet"
-if ! dpkg -s $ReqPKG  >/dev/null 2>&1; then
-  rm /root/setup.sh >/dev/null 2>&1 
-  exit
-else
-  clear
-fi
-
-
-secs_to_human() {
-    echo "Installation time : $(( ${1} / 3600 )) hours $(( (${1} / 60) % 60 )) minute's $(( ${1} % 60 )) seconds"
-}
-start=$(date +%s)
-ln -fs /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
-sysctl -w net.ipv6.conf.all.disable_ipv6=1 >/dev/null 2>&1
-sysctl -w net.ipv6.conf.default.disable_ipv6=1 >/dev/null 2>&1
-
-echo -e "[ ${BGreen}INFO${NC} ] Preparing the install file"
-run_with_spinner "apt install git curl -y" "Installing Git and Curl"
-run_with_spinner "apt install python -y" "Installing Python"
-# FIX: Install jq for domain script
-run_with_spinner "apt install jq -y" "Installing jq for domain generation"
-echo -e "[ ${BGreen}INFO${NC} ] Aight good ... installation file is ready"
-sleep 0.5
-echo -ne "[ ${BGreen}INFO${NC} ] Check permission : "
-
-echo -e "$BGreen Permission Accepted!$NC"
-sleep 2
-
-mkdir -p /var/lib/ >/dev/null 2>&1
-echo "IP=" >> /var/lib/ipvps.conf
-
-echo ""
+# ------------------------------ DOMAIN SETUP ------------------------------
 clear
 echo -e "$BBlue                     SETUP DOMAIN VPS     $NC"
 echo -e "$BYellow----------------------------------------------------------$NC"
-echo -e "$BGreen 1. Use Domain Random / Gunakan Domain Random $NC"
-echo -e "$BGreen 2. Choose Your Own Domain / Gunakan Domain Sendiri $NC"
+echo -e "$BGreen 1. Use Cloudflare Random Domain $NC"
+echo -e "$BGreen 2. Use Your Own Domain $NC"
 echo -e "$BYellow----------------------------------------------------------$NC"
-read -rp " input 1 or 2 / pilih 1 atau 2 : " dns
-if test $dns -eq 1; then
-run_with_spinner "wget https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/cf" "Downloading Domain Script"
-chmod +x cf
-# Try domain generation with better error handling
-if run_with_spinner "./cf" "Generating Random Domain"; then
-    # Check if domain was actually created
-    if [ -f /root/domain ] && [ -s /root/domain ]; then
-        dom=$(cat /root/domain)
-        echo -e "${BGreen}[SUCCESS] Domain generated: $dom${NC}"
-    else
-        echo -e "${red}[ERROR] Domain file not created, using fallback${NC}"
-        # Fallback domain
-        fallback_domain="fallback-$(date +%s).mahboubvps.site"
-        echo "$fallback_domain" > /root/domain
-        echo "$fallback_domain" > /root/scdomain
-        echo "$fallback_domain" > /etc/xray/domain
-        echo "$fallback_domain" > /etc/v2ray/domain
-        echo "IP=$fallback_domain" > /var/lib/ipvps.conf
-        echo -e "${BYellow}[INFO] Using fallback domain: $fallback_domain${NC}"
-    fi
+read -rp " Choose (1/2): " dns
+
+if [[ $dns == "1" ]]; then
+    run_with_spinner "wget -q -O /root/cf https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/cf" "Downloading Domain Engine"
+    chmod +x /root/cf
+    CF_OUTPUT=$(bash /root/cf)
+    dom=$(echo "$CF_OUTPUT" | grep -E -o '([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}')
+    [[ -z "$dom" ]] && echo -e "${red}[DOMAIN ERROR] Enter domain manually${NC}" && read -rp "Domain: " dom
 else
-    echo -e "${red}[ERROR] Domain generation failed, using fallback${NC}"
-    # Fallback domain
-    fallback_domain="fallback-$(date +%s).mahboubvps.site"
-    echo "$fallback_domain" > /root/domain
-    echo "$fallback_domain" > /root/scdomain
-    echo "$fallback_domain" > /etc/xray/domain
-    echo "$fallback_domain" > /etc/v2ray/domain
-    echo "IP=$fallback_domain" > /var/lib/ipvps.conf
-    echo -e "${BYellow}[INFO] Using fallback domain: $fallback_domain${NC}"
-fi
-elif test $dns -eq 2; then
-read -rp "Enter Your Domain / masukan domain : " dom
-echo "IP=$dom" > /var/lib/ipvps.conf
-echo "$dom" > /root/scdomain
-echo "$dom" > /etc/xray/scdomain
-echo "$dom" > /etc/xray/domain
-echo "$dom" > /etc/v2ray/domain
-echo "$dom" > /root/domain
-else 
-echo "Not Found Argument"
-exit 1
-fi
-echo -e "${BGreen}Done!${NC}"
-sleep 2
-clear
-    
-#install ssh ovpn
-echo -e "\e[33m-----------------------------------\033[0m"
-echo -e "$BGreen      Install SSH Websocket           $NC"
-echo -e "\e[33m-----------------------------------\033[0m"
-sleep 0.5
-clear
-run_with_spinner "wget https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/ssh-vpn.sh" "Downloading SSH Script"
-chmod +x ssh-vpn.sh
-run_with_spinner "./ssh-vpn.sh" "Installing SSH Websocket"
-
-#Instal Xray
-echo -e "\e[33m-----------------------------------\033[0m"
-echo -e "$BGreen          Install XRAY              $NC"
-echo -e "\e[33m-----------------------------------\033[0m"
-sleep 0.5
-clear
-run_with_spinner "wget https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/xray/ins-xray.sh" "Downloading Xray Script"
-chmod +x ins-xray.sh
-run_with_spinner "./ins-xray.sh" "Installing Xray Service"
-
-run_with_spinner "wget https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/sshws/insshws.sh" "Downloading SSHWS Script"
-chmod +x insshws.sh
-run_with_spinner "./insshws.sh" "Installing SSH WebSocket"
-
-clear
-cat> /root/.profile << END
-# ~/.profile: executed by Bourne-compatible login shells.
-
-if [ "$BASH" ]; then
-  if [ -f ~/.bashrc ]; then
-    . ~/.bashrc
-  fi
+    read -rp "Enter Domain: " dom
 fi
 
-mesg n || true
-clear
-menu
-END
-chmod 644 /root/.profile
+# Save domain everywhere
+echo "$dom" >/root/domain
+echo "$dom" >/root/scdomain
+echo "$dom" >/etc/xray/domain
+echo "$dom" >/etc/xray/scdomain
+echo "$dom" >/etc/v2ray/domain
+echo "IP=$dom" >/var/lib/ipvps.conf
 
-if [ -f "/root/log-install.txt" ]; then
-rm /root/log-install.txt > /dev/null 2>&1
-fi
-if [ -f "/etc/afak.conf" ]; then
-rm /etc/afak.conf > /dev/null 2>&1
-fi
-if [ ! -f "/etc/log-create-ssh.log" ]; then
-echo "Log SSH Account " > /etc/log-create-ssh.log
-fi
-if [ ! -f "/etc/log-create-vmess.log" ]; then
-echo "Log Vmess Account " > /etc/log-create-vmess.log
-fi
-if [ ! -f "/etc/log-create-vless.log" ]; then
-echo "Log Vless Account " > /etc/log-create-vless.log
-fi
-if [ ! -f "/etc/log-create-trojan.log" ]; then
-echo "Log Trojan Account " > /etc/log-create-trojan.log
-fi
-if [ ! -f "/etc/log-create-shadowsocks.log" ]; then
-echo "Log Shadowsocks Account " > /etc/log-create-shadowsocks.log
-fi
+echo -e "${BGreen}[SUCCESS] Domain Used → $dom${NC}"
+sleep 1; clear
+
+# ------------------------------ INSTALL SERVICES ------------------------------
+run_with_spinner "wget -q -O /root/ssh-vpn.sh https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/ssh-vpn.sh" "Download SSH / DROPBEAR / STUNNEL"
+chmod +x /root/ssh-vpn.sh; ./ssh-vpn.sh
+
+run_with_spinner "wget -q -O /root/ins-xray.sh https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/xray/ins-xray.sh" "Download XRAY Install Script"
+chmod +x /root/ins-xray.sh; ./ins-xray.sh
+
+run_with_spinner "wget -q -O /root/insshws.sh https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/sshws/insshws.sh" "Download SSHWS Script"
+chmod +x /root/insshws.sh; ./insshws.sh
+
+# ------------------------------ FINISH ------------------------------
 history -c
-serverV=$( curl -sS https://raw.githubusercontent.com/givpn/AutoScriptXray/master/menu/versi  )
-echo $serverV > /opt/.ver
-aureb=$(cat /home/re_otm)
-b=11
-if [ $aureb -gt $b ]
-then
-gg="PM"
-else
-gg="AM"
-fi
-curl -sS ipv4.icanhazip.com > /etc/myipvps
-
-# Service Status Check
-echo -e "\n${BBlue}================ SERVICE STATUS ================${NC}"
-services=("nginx" "ssh" "xray" "dropbear" "stunnel4")
-for service in "${services[@]}"; do
-    if systemctl is-active --quiet "$service"; then
-        echo -e "  ${BGreen}✓${NC} $service is running"
-    else
-        echo -e "  ${red}✗${NC} $service is not running"
-    fi
-done
+systemctl daemon-reload
 
 echo ""
-echo "=================================================================="  | tee -a log-install.txt
-echo "      ___                                    ___         ___      "  | tee -a log-install.txt
-echo "     /  /\        ___           ___         /  /\       /__/\     "  | tee -a log-install.txt
-echo "    /  /:/_      /  /\         /__/\       /  /::\      \  \:\    "  | tee -a log-install.txt
-echo "   /  /:/ /\    /  /:/         \  \:\     /  /:/\:\      \  \:\   "  | tee -a log-install.txt
-echo "  /  /:/_/::\  /__/::\          \  \:\   /  /:/~/:/  _____\__\:\  "  | tee -a log-install.txt
-echo " /__/:/__\/\:\ \__\/\:\__   ___  \__\:\ /__/:/ /:/  /__/::::::::\ "  | tee -a log-install.txt
-echo " \  \:\ /~~/:/    \  \:\/\ /__/\ |  |:| \  \:\/:/   \  \:\~~\~~\/ "  | tee -a log-install.txt
-echo "  \  \:\  /:/      \__\::/ \  \:\|  |:|  \  \::/     \  \:\  ~~~  "  | tee -a log-install.txt
-echo "   \  \:\/:/       /__/:/   \  \:\__|:|   \  \:\      \  \:\      "  | tee -a log-install.txt
-echo "    \  \::/        \__\/     \__\::::/     \  \:\      \  \:\     "  | tee -a log-install.txt
-echo "     \__\/                       ~~~~       \__\/       \__\/ 1.0 "  | tee -a log-install.txt
-echo "=================================================================="  | tee -a log-install.txt
-echo ""
-echo "   >>> Service & Port"  | tee -a log-install.txt
-echo "   - OpenSSH                  : 22"  | tee -a log-install.txt
-echo "   - SSH Websocket            : 80" | tee -a log-install.txt
-echo "   - SSH SSL Websocket        : 443" | tee -a log-install.txt
-echo "   - Stunnel4                 : 222, 777" | tee -a log-install.txt
-echo "   - Dropbear                 : 109, 143" | tee -a log-install.txt
-echo "   - Badvpn                   : 7100-7900" | tee -a log-install.txt
-echo "   - Nginx                    : 81" | tee -a log-install.txt
-echo "   - Vmess WS TLS             : 443" | tee -a log-install.txt
-echo "   - Vless WS TLS             : 443" | tee -a log-install.txt
-echo "   - Trojan WS TLS            : 443" | tee -a log-install.txt
-echo "   - Shadowsocks WS TLS       : 443" | tee -a log-install.txt
-echo "   - Vmess WS none TLS        : 80" | tee -a log-install.txt
-echo "   - Vless WS none TLS        : 80" | tee -a log-install.txt
-echo "   - Trojan WS none TLS       : 80" | tee -a log-install.txt
-echo "   - Shadowsocks WS none TLS  : 80" | tee -a log-install.txt
-echo "   - Vmess gRPC               : 443" | tee -a log-install.txt
-echo "   - Vless gRPC               : 443" | tee -a log-install.txt
-echo "   - Trojan gRPC              : 443" | tee -a log-install.txt
-echo "   - Shadowsocks gRPC         : 443" | tee -a log-install.txt
-echo ""
-echo "=============================Contact==============================" | tee -a log-install.txt
-echo "---------------------------t.me/givpn-----------------------------" | tee -a log-install.txt
-echo "==================================================================" | tee -a log-install.txt
-echo -e ""
-echo ""
-echo "" | tee -a log-install.txt
-rm /root/setup.sh >/dev/null 2>&1
-rm /root/ins-xray.sh >/dev/null 2>&1
-rm /root/insshws.sh >/dev/null 2>&1
-secs_to_human "$(($(date +%s) - ${start}))" | tee -a log-install.txt
-echo -e ""
-
 echo -e "${BGreen}===============================================${NC}"
 echo -e "${BGreen}            INSTALLATION COMPLETED             ${NC}"
 echo -e "${BGreen}===============================================${NC}"
-echo -e "${BBlue}All services have been installed successfully${NC}"
-echo -e "${BBlue}Check the service status above${NC}"
-echo -e "${BYellow}System will reboot in 10 seconds...${NC}"
+echo -e "${BBlue}DOMAIN : $dom${NC}"
+echo -e "${BBlue}REBOOT IN 10 SECONDS...${NC}"
 sleep 10
-rm -rf setup.sh
 reboot
-```
-
-Key fixes for domain generation:
-
-1. Added jq installation: Your domain script requires jq for JSON parsing
-2. Better error handling: Checks if domain file was actually created
-3. Fallback domain: If domain generation fails, creates a fallback domain
-4. Clear status messages: Shows exactly what's happening
-
-The domain should now work properly because:
-
-· ✅ jq is installed (required for your domain script)
-· ✅ Better error checking (verifies domain file creation)
-· ✅ Fallback mechanism (always has a working domain)
-· ✅ Clear feedback (shows success/failure status)
-
-Your domain script should now generate domains like asx-xxxxx.mahboubvps.site successfully!
