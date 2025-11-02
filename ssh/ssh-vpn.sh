@@ -217,11 +217,14 @@ sed -i '/Port 22/a Port 22' /etc/ssh/sshd_config
 echo "=== Install Dropbear ==="
 # install dropbear
 apt -y install dropbear
-sed -i 's/NO_START=1/NO_START=0/g' /etc/default/dropbear
-sed -i 's/DROPBEAR_PORT=22/DROPBEAR_PORT=143/g' /etc/default/dropbear
-sed -i 's/DROPBEAR_EXTRA_ARGS=/DROPBEAR_EXTRA_ARGS="-p 50000 -p 109 -p 110 -p 69"/g' /etc/default/dropbear
-echo "/bin/false" >> /etc/shells
-echo "/usr/sbin/nologin" >> /etc/shells
+cat <<'EOF' > /etc/default/dropbear
+NO_START=0
+DROPBEAR_PORT=69
+DROPBEAR_EXTRA_ARGS="-p 109"
+DROPBEAR_BANNER="/etc/issue.net"
+DROPBEAR_RECEIVE_WINDOW=65536
+EOF
+sudo systemctl restart dropbear
 /etc/init.d/ssh restart
 /etc/init.d/dropbear restart
 
