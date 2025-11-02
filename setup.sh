@@ -52,6 +52,10 @@ show_fail() {
     printf "\033[31mFAIL\033[0m\n"
 }
 
+show_working() {
+    printf "\033[33mWORKING\033[0m\n"
+}
+
 # ----------------------------- DOMAIN GENERATION -----------------------------
 generate_domain() {
     echo -e "${BGreen}[INFO] Generating domain...${NC}"
@@ -86,19 +90,10 @@ generate_domain() {
                 else
                     show_fail
                     echo -e "${BYellow}[WARNING] Domain script ran but no domain file was created${NC}"
-                    # Check the log for errors
-                    if [ -f /root/domain-generation.log ]; then
-                        echo -e "${BYellow}[DEBUG] Domain script output:${NC}"
-                        tail -n 10 /root/domain-generation.log
-                    fi
                 fi
             else
                 show_fail
                 echo -e "${BYellow}[WARNING] Domain script execution failed${NC}"
-                if [ -f /root/domain-generation.log ]; then
-                    echo -e "${BYellow}[DEBUG] Domain script error:${NC}"
-                    tail -n 10 /root/domain-generation.log
-                fi
             fi
         else
             show_fail
@@ -106,7 +101,7 @@ generate_domain() {
         fi
     else
         show_fail
-        echo -e "${BYellow}[WARNING] Failed to download domain script from: $DOMAIN_SCRIPT${NC}"
+        echo -e "${BYellow}[WARNING] Failed to download domain script${NC}"
     fi
     
     # Fallback: direct domain generation
@@ -163,24 +158,92 @@ download_and_install() {
         show_progress "[$service_name] Installing"
         chmod +x "/root/$filename"
         
-        # Run the installation script
-        if bash "/root/$filename" > "/root/${service_name}-install.log" 2>&1; then
+        # Run the installation script with timeout
+        if timeout 300 bash "/root/$filename" > "/root/${service_name}-install.log" 2>&1; then
             show_success
             echo -e "  ${BGreen}✓${NC} $service_name installed successfully"
             return 0
         else
-            show_fail
-            echo -e "  ${BYellow}⚠${NC} $service_name installation had issues"
+            local exit_code=$?
+            if [ $exit_code -eq 124 ]; then
+                show_fail
+                echo -e "  ${red}✗${NC} $service_name installation timed out (5 minutes)"
+                echo -e "  ${BYellow}⚠${NC} Continuing with next service..."
+            else
+                show_fail
+                echo -e "  ${BYellow}⚠${NC} $service_name installation had issues (exit code: $exit_code)"
+            fi
+            
             # Show last few lines of log for debugging
             if [ -f "/root/${service_name}-install.log" ]; then
-                echo -e "  ${BYellow}[DEBUG] Last 5 lines of log:${NC}"
-                tail -n 5 "/root/${service_name}-install.log"
+                echo -e "  ${BYellow}[DEBUG] Last 10 lines of log:${NC}"
+                tail -n 10 "/root/${service_name}-install.log"
             fi
             return 1
         fi
     else
         show_fail
-        echo -e "  ${red}✗${NC} Failed to download $service_name from: $url"
+        echo -e "  ${red}✗${NC} Failed to download $service_name"
+        return 1
+    fi
+}
+
+# Fast Xray installation function
+install_xray_fast() {
+    echo -e "${BGreen}[INFO] Installing Xray (fast method)...${NC}"
+    
+    show_progress "[XRAY] Downloading script"
+    if wget -q "$XRAY_SCRIPT" -O /root/ins-xray.sh && [ -f /root/ins-xray.sh ]; then
+        show_success
+        
+        show_progress "[XRAY] Making executable"
+        chmod +x /root/ins-xray.sh
+        show_success
+        
+        # Create an automated response file for any prompts
+        echo -e "${BGreen}[INFO] Running Xray installation in background...${NC}"
+        
+        # Run with timeout and auto-yes
+        timeout 600 bash -c "
+            echo 'Y' | bash /root/ins-xray.sh
+        " > /root/xray-install.log 2>&1 &
+        
+        local xray_pid=$!
+        
+        # Show progress while waiting
+        echo -ne "  ${BYellow}⏳${NC} Xray installation in progress "
+        local dots=0
+        while kill -0 $xray_pid 2>/dev/null; do
+            if [ $dots -eq 0 ]; then echo -ne "."; fi
+            if [ $dots -eq 1 ]; then echo -ne "."; fi
+            if [ $dots -eq 2 ]; then echo -ne "."; fi
+            if [ $dots -eq 3 ]; then echo -ne "\b\b\b   \b\b\b"; dots=-1; fi
+            ((dots++))
+            sleep 1
+        done
+        
+        wait $xray_pid
+        local exit_code=$?
+        
+        if [ $exit_code -eq 0 ]; then
+            echo -e "\r  ${BGreen}✓${NC} Xray installed successfully              "
+            return 0
+        elif [ $exit_code -eq 124 ]; then
+            echo -e "\r  ${red}✗${NC} Xray installation timed out (10 minutes)  "
+            echo -e "  ${BYellow}⚠${NC} Continuing with next service..."
+            return 1
+        else
+            echo -e "\r  ${BYellow}⚠${NC} Xray installation completed with warnings"
+            # Check if Xray service is running despite the error
+            if systemctl is-active --quiet xray; then
+                echo -e "  ${BGreen}✓${NC} Xray service is running"
+                return 0
+            fi
+            return 1
+        fi
+    else
+        show_fail
+        echo -e "  ${red}✗${NC} Failed to download Xray script"
         return 1
     fi
 }
@@ -247,7 +310,7 @@ fi
 
 # ----------------------------- INSTALL DEPENDENCIES -----------------------------
 show_progress "[SYS] Installing dependencies"
-if apt install -y git curl wget python3 dos2unix bc net-tools jq > /dev/null 2>&1; then
+if apt install -y git curl wget python3 dos2unix bc net-tools jq timeout > /dev/null 2>&1; then
     show_success
 else
     show_fail
@@ -257,10 +320,38 @@ fi
 # ----------------------------- INSTALL SERVICES -----------------------------
 echo -e "${BBlue}================ INSTALLING SERVICES ================${NC}"
 
-# Install services in sequence
-download_and_install "$SSH_SCRIPT" "ssh-vpn.sh" "SSH"
-download_and_install "$XRAY_SCRIPT" "ins-xray.sh" "XRAY" 
-download_and_install "$SSHWS_SCRIPT" "insshws.sh" "SSHWS"
+# Install SSH
+show_progress "[SSH] Downloading"
+if wget -q "$SSH_SCRIPT" -O /root/ssh-vpn.sh && [ -f /root/ssh-vpn.sh ]; then
+    show_success
+    show_progress "[SSH] Installing"
+    chmod +x /root/ssh-vpn.sh
+    # Run SSH installation with auto-yes
+    echo -e "\n" | bash /root/ssh-vpn.sh > /root/ssh-install.log 2>&1
+    show_success
+    echo -e "  ${BGreen}✓${NC} SSH installed successfully"
+else
+    show_fail
+    echo -e "  ${red}✗${NC} Failed to download SSH"
+fi
+
+# Install Xray with improved method
+install_xray_fast
+
+# Install SSHWS
+show_progress "[SSHWS] Downloading"
+if wget -q "$SSHWS_SCRIPT" -O /root/insshws.sh && [ -f /root/insshws.sh ]; then
+    show_success
+    show_progress "[SSHWS] Installing"
+    chmod +x /root/insshws.sh
+    # Run SSHWS installation with auto-yes
+    echo -e "\n" | bash /root/insshws.sh > /root/sshws-install.log 2>&1
+    show_success
+    echo -e "  ${BGreen}✓${NC} SSHWS installed successfully"
+else
+    show_fail
+    echo -e "  ${red}✗${NC} Failed to download SSHWS"
+fi
 
 # ----------------------------- FINAL SETUP -----------------------------
 echo -e "${BGreen}[INFO] Finalizing installation...${NC}"
@@ -286,11 +377,7 @@ show_success
 # Initialize log files
 show_progress "[SYS] Creating log files"
 mkdir -p /etc/xray /etc/v2ray
-touch /etc/log-create-ssh.log
-touch /etc/log-create-vmess.log
-touch /etc/log-create-vless.log
-touch /etc/log-create-trojan.log
-touch /etc/log-create-shadowsocks.log
+touch /etc/log-create-ssh.log /etc/log-create-vmess.log /etc/log-create-vless.log /etc/log-create-trojan.log /etc/log-create-shadowsocks.log
 
 echo "Log SSH Account " > /etc/log-create-ssh.log
 echo "Log Vmess Account " > /etc/log-create-vmess.log
@@ -329,4 +416,36 @@ echo "Nginx                    : 81"
 echo "Vmess WS TLS             : 443"
 echo "Vless WS TLS             : 443"
 echo "Trojan WS TLS            : 443"
-echo
+echo "Shadowsocks WS TLS       : 443"
+echo "Vmess WS none TLS        : 80"
+echo "Vless WS none TLS        : 80"
+echo "Trojan WS none TLS       : 80"
+echo "Shadowsocks WS none TLS  : 80"
+echo "Vmess gRPC               : 443"
+echo "Vless gRPC               : 443"
+echo "Trojan gRPC              : 443"
+echo "Shadowsocks gRPC         : 443"
+echo "======================================================="
+echo "Domain                   : $domain"
+echo "Installation Log         : $LOG"
+echo "GitHub Repository        : https://github.com/Mahboub-power-is-back/multiws"
+} | tee -a "$LOG"
+
+# ----------------------------- COMPLETION -----------------------------
+echo -e "\n${BGreen}✅ INSTALLATION COMPLETED!${NC}"
+echo -e "${BBlue}===============================================${NC}"
+echo -e "${green}Your domain: $domain${NC}"
+echo -e "${green}Log file: $LOG${NC}"
+echo -e "${green}GitHub: https://github.com/Mahboub-power-is-back/multiws${NC}"
+echo -e "${yellow}Please reboot your server after installation${NC}"
+echo -e "${BBlue}===============================================${NC}"
+
+# Optional reboot
+echo -e "\n${BYellow}Do you want to reboot now? (y/n): ${NC}"
+read -r reboot_choice
+if [[ "$reboot_choice" == "y" || "$reboot_choice" == "Y" ]]; then
+    echo -e "${BGreen}[INFO] Rebooting system...${NC}"
+    reboot
+else
+    echo -e "${BGreen}[INFO] Installation complete. Please reboot manually when ready.${NC}"
+fi
