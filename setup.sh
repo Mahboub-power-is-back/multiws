@@ -32,14 +32,14 @@ run_spinner() {
 }
 
 run_with_spinner() {
-    bash -c "$1" &> /root/lastlog.txt &
+    bash -c "$1" &>/root/lastlog.txt &
     run_spinner $! "$2"
 }
 
 # ----------------------------- PROGRESS BAR -----------------------------
 progress_bar() {
     printf "%-40s " "$1"
-    for i in {1..20}; do printf "█"; sleep 0.05; done
+    for i in {1..20}; do printf "█"; sleep 0.03; done
     printf " \033[32mOK\033[0m\n"
 }
 
@@ -50,7 +50,6 @@ sleep 1
 
 LOG="/root/log-install.txt"
 > "$LOG"
-
 mkdir -p /etc/xray /etc/v2ray
 
 # ----------------------------- DOMAIN MENU -----------------------------
@@ -60,9 +59,22 @@ read -p "Select option (1/2): " dns
 
 if [ "$dns" == "1" ]; then
     run_with_spinner "wget -q -O /root/cf https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/cf && chmod +x /root/cf && bash /root/cf" "[DNS] Generating Domain"
-    dom=$(cat /root/scdomain)
+
+    # FIXED DOMAIN DETECTION
+    if [ -f /root/scdomain ]; then
+        dom=$(cat /root/scdomain)
+    elif [ -f /etc/xray/scdomain ]; then
+        dom=$(cat /etc/xray/scdomain)
+    else
+        echo -e "\033[31m[ERROR]\033[0m Domain generation failed! Exiting."
+        exit 1
+    fi
 else
     read -p "Enter Domain: " dom
+    if [ -z "$dom" ]; then
+        echo -e "\033[31m[ERROR]\033[0m Domain cannot be empty!"
+        exit 1
+    fi
 fi
 
 # ----------------------------- SAVE DOMAIN -----------------------------
@@ -70,7 +82,7 @@ for f in /etc/xray/scdomain /etc/xray/domain /etc/v2ray/domain /root/scdomain /r
     echo "$dom" > "$f"
 done
 
-# ----------------------------- SYSTEM UPDATE (FAST) -----------------------------
+# ----------------------------- SYSTEM UPDATE FAST -----------------------------
 progress_bar "[SYS] Updating System"
 apt update -y &>/dev/null
 apt upgrade -y &>/dev/null
