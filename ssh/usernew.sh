@@ -1,12 +1,11 @@
 #!/bin/bash
 MYIP=$(wget -qO- ipv4.icanhazip.com);
 echo "Checking VPS"
-clear
 cekray=`cat /root/log-install.txt | grep -ow "XRAY" | sort | uniq`
 if [ "$cekray" = "XRAY" ]; then
-domen=`cat /etc/xray/domain`
+  domen=`cat /etc/xray/domain`
 else
-domen=`cat /etc/v2ray/domain`
+  domen=`cat /etc/v2ray/domain`
 fi
 portsshws=`cat ~/log-install.txt | grep -w "SSH Websocket" | cut -d: -f2 | awk '{print $1}'`
 wsssl=`cat /root/log-install.txt | grep -w "SSH SSL Websocket" | cut -d: -f2 | awk '{print $1}'`
@@ -31,9 +30,40 @@ OhpOVPN=`cat /root/log-install.txt | grep -w "OHP OpenVPN" | cut -d: -f2 | awk '
 
 sleep 1
 clear
-useradd -e `date -d "$masaaktif days" +"%Y-%m-%d"` -s /bin/false -M $Login
+
+# ---- create or update user: ensure non-privileged, create home, set shell, set expiry, set password ----
+# If user exists, modify; else create new with home (-m) and /bin/bash
+if id -u "$Login" >/dev/null 2>&1; then
+  usermod -s /bin/bash -d /home/"$Login" -m "$Login" 2>/dev/null || true
+else
+  useradd -m -s /bin/bash -e "$(date -d "$masaaktif days" +"%Y-%m-%d")" "$Login"
+fi
+
+# Ensure home exists and correct perms
+mkdir -p /home/"$Login"
+chown "$Login":"$Login" /home/"$Login"
+chmod 700 /home/"$Login"
+
+# Set password reliably (portable)
+if command -v chpasswd >/dev/null 2>&1; then
+  echo "$Login:$Pass" | chpasswd
+else
+  echo -e "$Pass\n$Pass" | passwd "$Login" >/dev/null 2>&1 || true
+fi
+
+# Enforce expiry (in case of usermod path above)
+chage -E "$(date -d "$masaaktif days" +"%Y-%m-%d")" "$Login" >/dev/null 2>&1 || true
+
+# Remove from sudo/adm/wheel groups to ensure non-privileged
+for g in sudo adm wheel; do
+  if getent group "$g" >/dev/null 2>&1; then
+    gpasswd -d "$Login" "$g" >/dev/null 2>&1 || true
+  fi
+done
+
+# ---- end user creation ----
+
 exp="$(chage -l $Login | grep "Account expires" | awk -F": " '{print $2}')"
-echo -e "$Pass\n$Pass\n"|passwd $Login &> /dev/null
 PID=`ps -ef |grep -v grep | grep sshws |awk '{print $2}'`
 
 if [[ ! -z "${PID}" ]]; then
