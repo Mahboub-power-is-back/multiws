@@ -5,21 +5,36 @@
 # ==========================================
 
 # Dependencies
-apt update -y && apt install -y jq curl git python3 unzip
+apt update -y && apt install -y jq curl git python3 unzip -y
 
 # ---------------------------
-# Generate Random Subdomain
+# DOMAIN SELECTION
 # ---------------------------
-sub=$(</dev/urandom tr -dc a-z0-9 | head -c5)
-DOMAIN="mahboubvps.site"
-SUB_DOMAIN="ws-${sub}.${DOMAIN}"
+echo "======================================"
+echo "          DOMAIN SELECTION MENU        "
+echo "======================================"
+echo "1) Use RANDOM Subdomain"
+echo "2) Use YOUR OWN Custom Domain"
+read -rp "Choose option (1/2): " DOMAIN_CHOICE
+
+MYIP=$(curl -s ipv4.icanhazip.com)
+DEFAULT_DOMAIN="mahboubvps.site"
 CF_TOKEN="XOYA63kolRF-6_EzxZQ22ESucCdm7zSJl7NEDQtA"
-IP=$(curl -s ipv4.icanhazip.com)
 ZONE="8761c8222fe8a4d1249e8563eedf43ee"
 
-echo "[*] Server IP: $IP"
-echo "[*] Subdomain to create: $SUB_DOMAIN"
-echo "[*] Using Zone ID: $ZONE"
+if [[ $DOMAIN_CHOICE == "1" ]]; then
+    sub=$(</dev/urandom tr -dc a-z0-9 | head -c5)
+    SUB_DOMAIN="ws-${sub}.${DEFAULT_DOMAIN}"
+elif [[ $DOMAIN_CHOICE == "2" ]]; then
+    read -rp "Enter your full custom domain: " CUSTOM_DOMAIN
+    SUB_DOMAIN="$CUSTOM_DOMAIN"
+else
+    echo "Invalid selection!"
+    exit 1
+fi
+
+echo "[*] Server IP: $MYIP"
+echo "[*] Domain to create: $SUB_DOMAIN"
 
 # ---------------------------
 # Create or Update Cloudflare Record
@@ -32,16 +47,16 @@ RECORD_ID=$(echo "$RESPONSE" | jq -r '.result[0].id')
 
 if [[ -z "$RECORD_ID" || "$RECORD_ID" == "null" ]]; then
     echo "[*] Record does not exist, creating..."
-    CREATE_RESPONSE=$(curl -sLX POST "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records" \
+    curl -sLX POST "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records" \
         -H "Authorization: Bearer ${CF_TOKEN}" \
         -H "Content-Type: application/json" \
-        --data "{\"type\":\"A\",\"name\":\"${SUB_DOMAIN}\",\"content\":\"${IP}\",\"ttl\":120,\"proxied\":false}")
+        --data "{\"type\":\"A\",\"name\":\"${SUB_DOMAIN}\",\"content\":\"${MYIP}\",\"ttl\":120,\"proxied\":false}"
 else
     echo "[*] Record exists, updating..."
-    UPDATE_RESPONSE=$(curl -sLX PUT "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records/${RECORD_ID}" \
+    curl -sLX PUT "https://api.cloudflare.com/client/v4/zones/${ZONE}/dns_records/${RECORD_ID}" \
         -H "Authorization: Bearer ${CF_TOKEN}" \
         -H "Content-Type: application/json" \
-        --data "{\"type\":\"A\",\"name\":\"${SUB_DOMAIN}\",\"content\":\"${IP}\",\"ttl\":120,\"proxied\":false}")
+        --data "{\"type\":\"A\",\"name\":\"${SUB_DOMAIN}\",\"content\":\"${MYIP}\",\"ttl\":120,\"proxied\":false}"
 fi
 
 # ---------------------------
@@ -49,29 +64,29 @@ fi
 # ---------------------------
 mkdir -p /etc/xray /etc/v2ray
 echo "$SUB_DOMAIN" | tee /root/domain /etc/xray/domain /etc/v2ray/domain /root/scdomain > /dev/null
-echo "IP=$IP" > /var/lib/ipvps.conf
+echo "IP=$MYIP" > /var/lib/ipvps.conf
 
-echo "✅ Subdomain created: $SUB_DOMAIN"
+echo "✅ Domain created: $SUB_DOMAIN"
 
 # ---------------------------
 # Install SSH Websocket
 # ---------------------------
 echo "[*] Installing SSH Websocket..."
-wget https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/ssh-vpn.sh -O ssh-vpn.sh
+wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/ssh-vpn.sh -O ssh-vpn.sh
 chmod +x ssh-vpn.sh && ./ssh-vpn.sh
 
 # ---------------------------
 # Install Xray
 # ---------------------------
 echo "[*] Installing Xray..."
-wget https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/xray/ins-xray.sh -O ins-xray.sh
+wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/xray/ins-xray.sh -O ins-xray.sh
 chmod +x ins-xray.sh && ./ins-xray.sh
 
 # ---------------------------
 # Install SSH WS
 # ---------------------------
 echo "[*] Installing SSH Websocket Config..."
-wget https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/sshws/insshws.sh -O insshws.sh
+wget -q https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/sshws/insshws.sh -O insshws.sh
 chmod +x insshws.sh && ./insshws.sh
 
 # ---------------------------
@@ -93,31 +108,36 @@ chmod 644 /root/.profile
 # ---------------------------
 # Log Install Info
 # ---------------------------
-echo ""
-echo "==================== Installation Complete ===================="
-echo "Subdomain: $SUB_DOMAIN"
-echo "IP VPS   : $IP"
-echo "---------------------------------------------------------------"
-echo "OpenSSH                  : 22"
-echo "SSH WS                   : 80"
-echo "SSH SSL WS               : 443"
-echo "Stunnel4                 : 222, 777"
-echo "Dropbear                 : 109, 143"
-echo "Badvpn                   : 7100-7900"
-echo "Nginx                    : 81"
-echo "Vmess WS TLS             : 443"
-echo "Vless WS TLS             : 443"
-echo "Trojan WS TLS            : 443"
-echo "Shadowsocks WS TLS       : 443"
-echo "Vmess WS none TLS        : 80"
-echo "Vless WS none TLS        : 80"
-echo "Trojan WS none TLS       : 80"
-echo "Shadowsocks WS none TLS  : 80"
-echo "Vmess gRPC               : 443"
-echo "Vless gRPC               : 443"
-echo "Trojan gRPC              : 443"
-echo "Shadowsocks gRPC         : 443"
-echo "================================================================"
-echo "✅ All done! Server will reboot in 10 seconds..."
+LOG_FILE="/root/log-install.txt"
+cat << EOF | tee $LOG_FILE
+
+==================== Installation Complete ====================
+Subdomain / Domain: $SUB_DOMAIN
+IP VPS             : $MYIP
+---------------------------------------------------------------
+OpenSSH                  : 22
+SSH WS                   : 80
+SSH SSL WS               : 443
+Stunnel4                 : 222, 777
+Dropbear                 : 109, 143
+Badvpn                   : 7100-7900
+Nginx                    : 81
+Vmess WS TLS             : 443
+Vless WS TLS             : 443
+Trojan WS TLS            : 443
+Shadowsocks WS TLS       : 443
+Vmess WS none TLS        : 80
+Vless WS none TLS        : 80
+Trojan WS none TLS       : 80
+Shadowsocks WS none TLS  : 80
+Vmess gRPC               : 443
+Vless gRPC               : 443
+Trojan gRPC              : 443
+Shadowsocks gRPC         : 443
+================================================================
+EOF
+
+echo "✅ All done! Log saved in $LOG_FILE"
+echo "Server will reboot in 10 seconds..."
 sleep 10
 reboot
