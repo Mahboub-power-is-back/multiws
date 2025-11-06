@@ -231,7 +231,7 @@ else
     printf "[ %bWARN%b ] Could not download ins-xray.sh, skipping.\n" "$BYELLOW" "$NC"
 fi
 
-if wget -q -O /root/insshws.sh "https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/sshws/insshws.sh"; then
+if wget -q -O /root/insshws.sh "https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/refs/heads/master/sshws/insshws.sh"; then
     chmod +x /root/insshws.sh
     /bin/bash /root/insshws.sh
 else
@@ -266,8 +266,11 @@ LOG="/root/log-install.txt"
     printf "│                         SERVICE & PORTS                                  │\n"
     printf "└───────────────────────────────────────────────────────────────┘\n"
     echo "   - OpenSSH                  : 22"
+    echo "   - OpenVPN                  : 1194
     echo "   - SSH Websocket            : 80"
     echo "   - SSH SSL Websocket        : 443"
+    echo "   - OVPN Websocket           : 80"
+    echo "   - OVPN SSL Websocket       : 443"
     echo "   - Stunnel4                 : 222, 777"
     echo "   - Dropbear                 : 109, 143"
     echo "   - UDP CUSTOM               : 1-65535"
