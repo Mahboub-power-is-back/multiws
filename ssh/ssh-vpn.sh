@@ -267,8 +267,10 @@ sed -i 's/ENABLED=0/ENABLED=1/g' /etc/default/stunnel4
 /lib/systemd/systemd-sysv-install enable stunnel4
 systemctl start stunnel4
 /etc/init.d/stunnel4 restart
-
-
+# OPENVPN INSTALL
+wget https://raw.githubusercontent.com/Mahboub-power-is-back/update244/refs/heads/main/ssh/vpn.sh
+chmod 777 vpn.sh
+bash vpn.sh
 # install fail2ban
 apt -y install fail2ban
 
