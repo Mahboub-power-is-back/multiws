@@ -9,7 +9,9 @@ else
 fi
 portsshws=`cat ~/log-install.txt | grep -w "SSH Websocket" | cut -d: -f2 | awk '{print $1}'`
 wsssl=`cat /root/log-install.txt | grep -w "SSH SSL Websocket" | cut -d: -f2 | awk '{print $1}'`
-
+ovpnsws=`cat /root/log-install.txt | grep -w "SSH SSL Websocket" | cut -d: -f2 | awk '{print $1}'`
+portovpnws=`cat ~/log-install.txt | grep -w "SSH Websocket" | cut -d: -f2 | awk '{print $1}'`
+UDPCUSTOM=`cat ~/log-install.txt | grep -w "UDPCUSTOM" | cut -d: -f2 | awk '{print $1}'`
 echo -e "\033[0;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
 echo -e "\E[0;41;36m            SSH Account            \E[0m"
 echo -e "\033[0;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
@@ -77,8 +79,10 @@ echo -e "\033[0;34m━━━━━━━━━━━━━━━━━━━━�
 echo -e "IP          : $IP" | tee -a /etc/log-create-ssh.log
 echo -e "Host        : $domen" | tee -a /etc/log-create-ssh.log
 echo -e "OpenSSH     : $opensh" | tee -a /etc/log-create-ssh.log
-echo -e "SSH WS      : $portsshws" | tee -a /etc/log-create-ssh.log
-echo -e "SSH SSL WS  : $wsssl" | tee -a /etc/log-create-ssh.log
+echo -e "OpenVPN     : $openvpn" | tee -a /etc/log-create-ssh.log
+echo -e "UDPCUSTOM   : $udpcustom" | tee -a /etc/log-create-ssh.log
+echo -e "SSH OVPN WS : $portsshws" | tee -a /etc/log-create-ssh.log
+echo -e "SSHOVPN SSLWS  : $wsssl" | tee -a /etc/log-create-ssh.log
 echo -e "SSL/TLS     :$ssl" | tee -a /etc/log-create-ssh.log
 echo -e "UDPGW       : 7100-7900" | tee -a /etc/log-create-ssh.log
 echo -e "\033[0;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m" | tee -a /etc/log-create-ssh.log
@@ -104,8 +108,10 @@ echo -e "\033[0;34m━━━━━━━━━━━━━━━━━━━━�
 echo -e "IP          : $IP" | tee -a /etc/log-create-ssh.log
 echo -e "Host        : $domen" | tee -a /etc/log-create-ssh.log
 echo -e "OpenSSH     : $opensh" | tee -a /etc/log-create-ssh.log
-echo -e "SSH WS      : $portsshws" | tee -a /etc/log-create-ssh.log
-echo -e "SSH SSL WS  : $wsssl" | tee -a /etc/log-create-ssh.log
+echo -e "OpenVPN     : $openvpn" | tee -a /etc/log-create-ssh.log
+echo -e "UDPCUSTOM   : $udpcustom" | tee -a /etc/log-create-ssh.log
+echo -e "SSH OVPN WS : $portsshws" | tee -a /etc/log-create-ssh.log
+echo -e "SSHOVPN SSLWS  : $wsssl" | tee -a /etc/log-create-ssh.log
 echo -e "SSL/TLS     :$ssl" | tee -a /etc/log-create-ssh.log
 echo -e "UDPGW       : 7100-7900" | tee -a /etc/log-create-ssh.log
 echo -e "\033[0;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m" | tee -a /etc/log-create-ssh.log
