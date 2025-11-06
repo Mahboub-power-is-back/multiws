@@ -266,7 +266,7 @@ LOG="/root/log-install.txt"
     printf "│                         SERVICE & PORTS                                  │\n"
     printf "└───────────────────────────────────────────────────────────────┘\n"
     echo "   - OpenSSH                  : 22"
-    echo "   - OpenVPN                  : 1194
+    echo "   - OpenVPN                  : 1194"
     echo "   - SSH Websocket            : 80"
     echo "   - SSH SSL Websocket        : 443"
     echo "   - OVPN Websocket           : 80"
