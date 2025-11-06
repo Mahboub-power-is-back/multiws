@@ -79,8 +79,8 @@ echo -e "\033[0;34m━━━━━━━━━━━━━━━━━━━━�
 echo -e "IP          : $IP" | tee -a /etc/log-create-ssh.log
 echo -e "Host        : $domen" | tee -a /etc/log-create-ssh.log
 echo -e "OpenSSH     : $opensh" | tee -a /etc/log-create-ssh.log
-echo -e "OpenVPN     : $openvpn" | tee -a /etc/log-create-ssh.log
-echo -e "UDPCUSTOM   : $udpcustom" | tee -a /etc/log-create-ssh.log
+echo -e "OpenVPN     : 1194" | tee -a /etc/log-create-ssh.log
+echo -e "UDPCUSTOM   : 1-65535" | tee -a /etc/log-create-ssh.log
 echo -e "SSH OVPN WS : $portsshws" | tee -a /etc/log-create-ssh.log
 echo -e "SSHOVPN SSLWS  : $wsssl" | tee -a /etc/log-create-ssh.log
 echo -e "SSL/TLS     :$ssl" | tee -a /etc/log-create-ssh.log
@@ -108,8 +108,8 @@ echo -e "\033[0;34m━━━━━━━━━━━━━━━━━━━━�
 echo -e "IP          : $IP" | tee -a /etc/log-create-ssh.log
 echo -e "Host        : $domen" | tee -a /etc/log-create-ssh.log
 echo -e "OpenSSH     : $opensh" | tee -a /etc/log-create-ssh.log
-echo -e "OpenVPN     : $openvpn" | tee -a /etc/log-create-ssh.log
-echo -e "UDPCUSTOM   : $udpcustom" | tee -a /etc/log-create-ssh.log
+echo -e "OpenVPN     : 1194" | tee -a /etc/log-create-ssh.log
+echo -e "UDPCUSTOM   : 1-65535" | tee -a /etc/log-create-ssh.log
 echo -e "SSH OVPN WS : $portsshws" | tee -a /etc/log-create-ssh.log
 echo -e "SSHOVPN SSLWS  : $wsssl" | tee -a /etc/log-create-ssh.log
 echo -e "SSL/TLS     :$ssl" | tee -a /etc/log-create-ssh.log
