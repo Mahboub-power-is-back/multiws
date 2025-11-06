@@ -5,7 +5,7 @@ cd
 #Install Script Websocket-SSH Python
 wget -O /usr/local/bin/ws-dropbear https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/refs/heads/master/sshws/ws-dropbear
 wget -O /usr/local/bin/ws-stunnel https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/refs/heads/master/sshws/ws-stunnel
-wget -O /usr/local/bin/ws-stunnel https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/refs/heads/master/sshws/ws-ovpn
+wget -O /usr/local/bin/ws-ovpn https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/refs/heads/master/sshws/ws-ovpn
 #izin permision
 chmod +x /usr/local/bin/ws-dropbear
 chmod +x /usr/local/bin/ws-stunnel
@@ -17,7 +17,7 @@ wget -O /etc/systemd/system/ws-dropbear.service https://raw.githubusercontent.co
 wget -O /etc/systemd/system/ws-stunnel.service https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/refs/heads/master/sshws/ws-stunnel.service && chmod +x /etc/systemd/system/ws-stunnel.service
 #System ovpn Websocket
 
-wget -O /etc/systemd/system/ws-ovpn.service https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/refs/heads/master/sshws/ws-ovpn.service
+wget -O /etc/systemd/system/ws-ovpn.service https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/refs/heads/master/sshws/ws-ovpn.service && chmod +x /etc/systemd/system/ws-ovpn.service
 #restart service
 systemctl daemon-reload
 
