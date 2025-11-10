@@ -42,7 +42,7 @@ case "$dns" in
   1)
     # Random A + NS
     SUB="ws-$(tr -dc a-z0-9 </dev/urandom | head -c5).$DOMAIN"
-    NS_SUB="ns-$(tr -dc a-z0-9 </dev/urandom | head -c5).$DOMAIN"
+    NS_SUB="dns.$SUB"   # NS points to A record
 
     # Create A record
     curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records" \
@@ -50,7 +50,7 @@ case "$dns" in
       -H "Content-Type: application/json" \
       --data "{\"type\":\"A\",\"name\":\"$SUB\",\"content\":\"$IP\",\"ttl\":120,\"proxied\":false}" >/dev/null
 
-    # Create NS record
+    # Create NS record pointing to A
     curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records" \
       -H "Authorization: Bearer $CF_TOKEN" \
       -H "Content-Type: application/json" \
@@ -74,9 +74,9 @@ case "$dns" in
   4)
     read -rp "Enter your domain (A+NS): " dom
     SUB="$dom"
-    NS_SUB="ns-$(tr -dc a-z0-9 </dev/urandom | head -c5).$DOMAIN"
+    NS_SUB="dns.$SUB"   # NS points to A record
 
-    # Create NS record
+    # Create NS record pointing to A
     curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records" \
       -H "Authorization: Bearer $CF_TOKEN" \
       -H "Content-Type: application/json" \
@@ -136,7 +136,8 @@ After=network.target
 Type=simple
 WorkingDirectory=/root
 ExecStartPre=/sbin/iptables -A INPUT -p tcp --dport 5300 -j ACCEPT
-ExecStart=/usr/local/bin/dnstt-server -mtu 512 -udp :5300 -privkey e35bb50094b4d06a17a7606ae724db082398a4cf86ad79bcdcf890386eb65a88 $DnsNS 127.0.0.1:$PORT1
+ExecStartPre=/sbin/iptables -t nat -A PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300
+ExecStart=/usr/local/bin/dnstt-server -udp :5300 -privkey e35bb50094b4d06a17a7606ae724db082398a4cf86ad79bcdcf890386eb65a88 $DnsNS 127.0.0.1:$PORT1
 StandardOutput=append:/var/log/dnstt.log
 StandardError=append:/var/log/dnstt.log
 Restart=always
