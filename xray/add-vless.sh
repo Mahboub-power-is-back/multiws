@@ -48,6 +48,8 @@ echo -e "\E[44;1;39m        Vless Account        \E[0m" | tee -a /etc/log-create
 echo -e "\033[0;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m" | tee -a /etc/log-create-vless.log
 echo -e "Remarks        : ${user}" | tee -a /etc/log-create-vless.log
 echo -e "Domain         : ${domain}" | tee -a /etc/log-create-vless.log
+echo -e "NS-Host        : dns.${domain}" | tee -a /etc/log-create-vless.log
+echo -e "PubKey        : 5e9daef958ea3d4922601a8f11abacdce231f0cf6cc7feb4fdb3a7013cc92a0f" | tee -a /etc/log-create-vless.log
 echo -e "Wildcard       : (bug.com).${domain}" | tee -a /etc/log-create-vless.log
 echo -e "Port TLS       : $tls" | tee -a /etc/log-create-vless.log
 echo -e "Port none TLS  : $none" | tee -a /etc/log-create-vless.log
