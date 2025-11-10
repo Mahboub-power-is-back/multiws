@@ -1,6 +1,6 @@
 #!/bin/bash
 apt update -y >/dev/null 2>&1
-apt install -y jq curl >/dev/null 2>&1
+apt install -y jq curl wget >/dev/null 2>&1
 
 # ------------------------------
 # Cloudflare API Info
@@ -111,6 +111,47 @@ chmod +x /root/insshws.sh
 bash /root/insshws.sh
 
 # ------------------------------
+# Install DNSTT Service (Port 443)
+# ------------------------------
+if [ -f /root/nsdomain ]; then
+    DnsNS=$(cat /root/nsdomain)
+else
+    echo "[ERROR] NS domain not found! Skipping DNSTT."
+    DnsNS=""
+fi
+
+PORT1=443
+wget -q -c https://raw.githubusercontent.com/Mahboub-power-is-back/Myapp/refs/heads/main/dnstt-server -O /usr/local/bin/dnstt-server
+chmod +x /usr/local/bin/dnstt-server
+clear
+
+echo '=== Installing DNSTT SERVICE ==='
+
+cat <<EOF > /etc/systemd/system/dnstt-service.service
+[Unit]
+Description=DNSTT Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root
+ExecStartPre=/sbin/iptables -A INPUT -p tcp --dport $PORT1 -j ACCEPT
+ExecStart=/usr/local/bin/dnstt-server -mtu 512 -udp :$PORT1 -privkey e35bb50094b4d06a17a7606ae724db082398a4cf86ad79bcdcf890386eb65a88 $DnsNS 127.0.0.1:$PORT1
+StandardOutput=append:/var/log/dnstt.log
+StandardError=append:/var/log/dnstt.log
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl start dnstt-service
+systemctl enable dnstt-service
+echo "✅ DNSTT server started on TCP/UDP port $PORT1 → using NS: $DnsNS"
+
+# ------------------------------
 # Setup .profile
 # ------------------------------
 cat > /root/.profile <<'END_PROFILE'
@@ -157,6 +198,7 @@ echo "   - Vmess gRPC               : 443"
 echo "   - Vless gRPC               : 443"
 echo "   - Trojan gRPC              : 443"
 echo "   - Shadowsocks gRPC         : 443"
+echo "   - DNSTT Server             : 443"
 echo ""
 } >>"$LOG"
 
