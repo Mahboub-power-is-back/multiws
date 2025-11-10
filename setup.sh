@@ -135,8 +135,8 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/root
-ExecStartPre=/sbin/iptables -A INPUT -p tcp --dport $PORT1 -j ACCEPT
-ExecStart=/usr/local/bin/dnstt-server -mtu 512 -udp :$PORT1 -privkey e35bb50094b4d06a17a7606ae724db082398a4cf86ad79bcdcf890386eb65a88 $DnsNS 127.0.0.1:$PORT1
+ExecStartPre=/sbin/iptables -A INPUT -p tcp --dport 5300 -j ACCEPT
+ExecStart=/usr/local/bin/dnstt-server -mtu 512 -udp :5300 -privkey e35bb50094b4d06a17a7606ae724db082398a4cf86ad79bcdcf890386eb65a88 $DnsNS 127.0.0.1:$PORT1
 StandardOutput=append:/var/log/dnstt.log
 StandardError=append:/var/log/dnstt.log
 Restart=always
