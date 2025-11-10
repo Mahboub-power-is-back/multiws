@@ -78,6 +78,8 @@ echo -e "Expired On  : $exp" | tee -a /etc/log-create-ssh.log
 echo -e "\033[0;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m" | tee -a /etc/log-create-ssh.log
 echo -e "IP          : $IP" | tee -a /etc/log-create-ssh.log
 echo -e "Host        : $domen" | tee -a /etc/log-create-ssh.log
+echo -e "NS-Host        : dns.$domen" | tee -a /etc/log-create-ssh.log
+echo -e "PubKey        : 5e9daef958ea3d4922601a8f11abacdce231f0cf6cc7feb4fdb3a7013cc92a0f" | tee -a /etc/log-create-ssh.log
 echo -e "OpenSSH     : $opensh" | tee -a /etc/log-create-ssh.log
 echo -e "OpenVPN     : 1194" | tee -a /etc/log-create-ssh.log
 echo -e "UDPCUSTOM   : 1-65535" | tee -a /etc/log-create-ssh.log
@@ -107,6 +109,8 @@ echo -e "Expired On  : $exp" | tee -a /etc/log-create-ssh.log
 echo -e "\033[0;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m" | tee -a /etc/log-create-ssh.log
 echo -e "IP          : $IP" | tee -a /etc/log-create-ssh.log
 echo -e "Host        : $domen" | tee -a /etc/log-create-ssh.log
+echo -e "NS-Host        : dns.$domen" | tee -a /etc/log-create-ssh.log
+echo -e "PubKey        : 5e9daef958ea3d4922601a8f11abacdce231f0cf6cc7feb4fdb3a7013cc92a0f" | tee -a /etc/log-create-ssh.log
 echo -e "OpenSSH     : $opensh" | tee -a /etc/log-create-ssh.log
 echo -e "OpenVPN     : 1194" | tee -a /etc/log-create-ssh.log
 echo -e "UDPCUSTOM   : 1-65535" | tee -a /etc/log-create-ssh.log
