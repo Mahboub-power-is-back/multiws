@@ -344,16 +344,6 @@ RestartSec=2s
 WantedBy=multi-user.target
 EOF
 
-sudo cat > /root/udp/config.json <<'EOF'
-{
-  "listen": ":36712",
-  "stream_buffer": 33554432,
-  "receive_buffer": 83886080,
-  "auth": {
-    "mode": "passwords"
-  }
-}
-EOF
 sudo systemctl daemon-reload
 sudo systemctl enable udpcustom.service
 sudo systemctl start udpcustom.service
