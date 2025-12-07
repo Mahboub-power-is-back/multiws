@@ -206,8 +206,16 @@ echo ""
 # ------------------------------
 # Finish
 # ------------------------------
+chmod 644 /etc/systemd/system/ws-stunnel.service
+chmod 644 /etc/systemd/system/ws-ovpn.service
+chmod 644 /etc/systemd/system/ws-dropbear.service
+chmod 644 /etc/systemd/system/xray.service
 history -c
 echo "Installation complete! Rebooting in 10 seconds..."
 sleep 10
 rm -f /root/setup.sh
+chmod 644 /etc/systemd/system/ws-stunnel.service
+chmod 644 /etc/systemd/system/ws-ovpn.service
+chmod 644 /etc/systemd/system/ws-dropbear.service
+chmod 644 /etc/systemd/system/xray.service
 reboot
