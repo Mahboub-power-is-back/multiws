@@ -323,11 +323,22 @@ iptables-restore -t < /etc/iptables.up.rules
 netfilter-persistent save
 netfilter-persistent reload
 #install udp
+
 mkdir -p /root/udp
 cd /root/udp
 wget https://raw.githubusercontent.com/Mahboub-power-is-back/update244/main/udp-custom-linux-amd64
 chmod +x /root/udp/udp-custom-linux-amd64
-sudo cat > /etc/systemd/system/udpcustom.service <<'EOF'
+sudo cat > /root/udp/config.json <<'EOF'
+{
+  "listen": ":36712",
+  "stream_buffer": 33554432,
+  "receive_buffer": 83886080,
+  "auth": {
+    "mode": "passwords"
+  }
+}
+EOF
+cat << 'EOF' > /etc/systemd/system/udpcustom.service
 [Unit]
 Description=UDP Custom by ePro Dev. Team
 After=network.target
@@ -335,18 +346,24 @@ After=network.target
 [Service]
 User=root
 Type=simple
-ExecStart=/root/udp/udp-custom-linux-amd64 server
-WorkingDirectory=/root/udp/
+WorkingDirectory=/root/udp
+ExecStart=/root/udp/udp-custom-linux-amd64 -config /root/udp/config.json
 Restart=always
 RestartSec=2s
 
 [Install]
 WantedBy=multi-user.target
 EOF
+# Make sure the binary exists and is executable
+mkdir -p /root/udp
+mv /root/udp-custom-linux-amd64 /root/udp/  # if it's not already there
+chmod +x /root/udp/udp-custom-linux-amd64
 
-sudo systemctl daemon-reload
-sudo systemctl enable udpcustom.service
-sudo systemctl start udpcustom.service
+# Reload systemd and start the service
+systemctl daemon-reload
+systemctl enable udpcustom.service
+systemctl start udpcustom.service
+
 # download script
 cd /usr/bin
 # menu
