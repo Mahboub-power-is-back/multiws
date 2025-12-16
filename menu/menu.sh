@@ -15,6 +15,7 @@ RESET='\e[0m'
 get_sys_info() {
     DOMAIN=$(cat /etc/xray/domain 2>/dev/null || echo "Not Set")
     NSDOMAIN=$(cat nsdomain)
+    SLPUBKEY=$(5e9daef958ea3d4922601a8f11abacdce231f0cf6cc7feb4fdb3a7013cc92a0f)
     UPTIME=$(uptime -p | sed 's/up //')
     IPVPS=$(curl -s ifconfig.me)
     LOC=$(curl -s ifconfig.co/country)
