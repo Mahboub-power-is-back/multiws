@@ -1,55 +1,76 @@
 #!/bin/bash
 
 # ------------------------------
-# Progress Bar Functions
+# Loading Bar Functions (Bar + Percentage)
 # ------------------------------
-show_progress() {
+show_loading() {
     local pid=$1
     local msg=$2
+    local bar_length=30
     local delay=0.1
-    local spinstr='|/-\'
-    local temp
+    local i=0
+    local spin_chars=('|' '/' '-' '\')
     
     echo -n "$msg...  "
-    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
-        temp=${spinstr#?}
-        printf " [%c]  " "$spinstr"
-        spinstr=$temp${spinstr%"$temp"}
+    
+    while kill -0 $pid 2>/dev/null; do
+        local pos=$((i % bar_length))
+        local filled=$(printf "%${pos}s" | tr ' ' '█')
+        local empty=$(printf "%$((bar_length - pos))s" | tr ' ' '░')
+        local percent=$((pos * 100 / bar_length))
+        local spin_char="${spin_chars[$((i % 4))]}"
+        
+        printf "\r[%s%s] %3d%% %s" "$filled" "$empty" "$percent" "$spin_char"
+        ((i++))
         sleep $delay
-        printf "\b\b\b\b\b\b"
     done
-    printf "    \b\b\b\b"
-    echo -e "\r✅ $msg completed!"
+    
+    printf "\r[██████████████████████████████] 100%% ✓\n"
 }
 
-progress_bar() {
-    local duration=${1}
-    local columns=$(tput cols)
-    local space=$((columns - 30))
-    local increment=$((duration / space))
+progress_line() {
+    local msg=$1
+    local width=50
+    echo -n "$msg "
     
-    for ((i=0; i<=space; i++)); do
-        echo -ne "\r["
+    for ((i=0; i<=width; i++)); do
+        printf "["
         for ((j=0; j<i; j++)); do
-            echo -ne "#"
+            printf "▰"
         done
-        for ((j=i; j<space; j++)); do
-            echo -ne " "
+        for ((j=i; j<width; j++)); do
+            printf "▱"
         done
-        echo -ne "] $(( (i * 100) / space ))%"
-        sleep $increment
+        printf "] %d%%\r" $((i * 2))
+        sleep 0.05
     done
     echo ""
 }
 
-apt_update_install() {
-    echo "📦 Updating package list..."
-    apt update -y >/dev/null 2>&1 &
-    show_progress $! "System update"
+install_with_progress() {
+    local msg=$1
+    shift
+    local command="$@"
     
-    echo "📦 Installing dependencies..."
-    apt install -y jq curl wget >/dev/null 2>&1 &
-    show_progress $! "Dependencies installation"
+    echo -ne "$msg... "
+    ($command >/dev/null 2>&1) &
+    local pid=$!
+    
+    local dots=0
+    while kill -0 $pid 2>/dev/null; do
+        case $dots in
+            0) echo -ne "|   \r";;
+            1) echo -ne "/   \r";;
+            2) echo -ne "-   \r";;
+            3) echo -ne "\\   \r";;
+        esac
+        dots=$(((dots + 1) % 4))
+        sleep 0.2
+    done
+    
+    wait $pid
+    echo -ne "✓      \r"
+    echo "$msg... Done!"
 }
 
 # ------------------------------
@@ -76,11 +97,18 @@ echo ""
 # ------------------------------
 # Initial setup
 # ------------------------------
-apt_update_install
+echo "📦 Updating system packages..."
+apt update -y >/dev/null 2>&1 &
+show_loading $! "System Update"
 
-echo "📁 Creating necessary directories..."
+echo "📦 Installing dependencies..."
+apt install -y jq curl wget >/dev/null 2>&1 &
+show_loading $! "Dependencies"
+
+echo "📁 Creating directory structure..."
 mkdir -p /etc/xray /etc/v2ray /root/scripts /var/lib 2>/dev/null
 touch /etc/xray/domain /etc/v2ray/domain /etc/xray/scdomain /etc/v2ray/scdomain /root/scdomain
+progress_line "Directory Setup"
 echo "✅ Directory structure created"
 
 IP=$(curl -s ipv4.icanhazip.com)
@@ -120,14 +148,14 @@ case "$dns" in
       -H "Authorization: Bearer $CF_TOKEN" \
       -H "Content-Type: application/json" \
       --data "{\"type\":\"A\",\"name\":\"$SUB\",\"content\":\"$IP\",\"ttl\":120,\"proxied\":false}" >/dev/null &
-    show_progress $! "Creating A record"
+    show_loading $! "Creating A Record"
     
     echo "  📝 Creating NS record: $NS_SUB → $SUB"
     curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records" \
       -H "Authorization: Bearer $CF_TOKEN" \
       -H "Content-Type: application/json" \
       --data "{\"type\":\"NS\",\"name\":\"$NS_SUB\",\"content\":\"$SUB\",\"ttl\":120}" >/dev/null &
-    show_progress $! "Creating NS record"
+    show_loading $! "Creating NS Record"
     
     echo "$SUB" | tee /root/scdomain /etc/xray/domain /etc/v2ray/domain /etc/xray/scdomain /var/lib/ipvps.conf >/dev/null
     echo "$NS_SUB" | tee /root/nsdomain >/dev/null
@@ -140,7 +168,7 @@ case "$dns" in
       -H "Authorization: Bearer $CF_TOKEN" \
       -H "Content-Type: application/json" \
       --data "{\"type\":\"A\",\"name\":\"$SUB\",\"content\":\"$IP\",\"ttl\":120,\"proxied\":false}" >/dev/null &
-    show_progress $! "Creating A record"
+    show_loading $! "Creating A Record"
     
     echo "$SUB" | tee /root/scdomain /etc/xray/domain /etc/v2ray/domain >/dev/null
     ;;
@@ -148,7 +176,7 @@ case "$dns" in
     read -rp "Enter your domain (A only): " dom
     echo ""
     echo "⏳ Setting up domain: $dom"
-    progress_bar 2
+    progress_line "Domain Configuration"
     echo "$dom" | tee /root/scdomain /etc/xray/domain /etc/v2ray/domain >/dev/null
     SUB="$dom"
     ;;
@@ -164,7 +192,7 @@ case "$dns" in
       -H "Authorization: Bearer $CF_TOKEN" \
       -H "Content-Type: application/json" \
       --data "{\"type\":\"NS\",\"name\":\"$NS_SUB\",\"content\":\"$SUB\",\"ttl\":120}" >/dev/null &
-    show_progress $! "Creating NS record"
+    show_loading $! "Creating NS Record"
     
     echo "$SUB" | tee /root/scdomain /etc/xray/domain /etc/v2ray/domain >/dev/null
     echo "$NS_SUB" | tee /root/nsdomain >/dev/null
@@ -187,30 +215,30 @@ echo ""
 
 echo "📥 Downloading SSH VPN installer..."
 wget -q -O /root/ssh-vpn.sh "https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/ssh-vpn.sh" &
-show_progress $! "Downloading SSH VPN script"
+show_loading $! "Download SSH VPN"
 chmod +x /root/ssh-vpn.sh
 
 echo "🔄 Installing SSH VPN service..."
 bash /root/ssh-vpn.sh >/dev/null 2>&1 &
-show_progress $! "Installing SSH VPN"
+show_loading $! "Install SSH VPN"
 
 echo "📥 Downloading Xray installer..."
 wget -q -O /root/ins-xray.sh "https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/xray/ins-xray.sh" &
-show_progress $! "Downloading Xray script"
+show_loading $! "Download Xray"
 chmod +x /root/ins-xray.sh
 
 echo "🔄 Installing Xray service..."
 bash /root/ins-xray.sh >/dev/null 2>&1 &
-show_progress $! "Installing Xray"
+show_loading $! "Install Xray"
 
 echo "📥 Downloading SSH Websocket installer..."
 wget -q -O /root/insshws.sh "https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/refs/heads/master/sshws/insshws.sh" &
-show_progress $! "Downloading SSH Websocket script"
+show_loading $! "Download SSH Websocket"
 chmod +x /root/insshws.sh
 
 echo "🔄 Installing SSH Websocket..."
 bash /root/insshws.sh >/dev/null 2>&1 &
-show_progress $! "Installing SSH Websocket"
+show_loading $! "Install SSH Websocket"
 
 # ------------------------------
 # Install DNSTT Service
@@ -228,7 +256,7 @@ fi
 PORT1=443
 echo "📥 Downloading DNSTT server..."
 wget -q -c https://raw.githubusercontent.com/Mahboub-power-is-back/Myapp/refs/heads/main/dnstt-server -O /usr/local/bin/dnstt-server &
-show_progress $! "Downloading DNSTT server"
+show_loading $! "Download DNSTT Server"
 chmod +x /usr/local/bin/dnstt-server
 
 echo "🔄 Configuring DNSTT service..."
@@ -255,7 +283,7 @@ EOF
 echo "⚙️ Starting DNSTT service..."
 systemctl daemon-reload >/dev/null 2>&1
 systemctl start dnstt-service >/dev/null 2>&1 &
-show_progress $! "Starting DNSTT service"
+show_loading $! "Start DNSTT Service"
 systemctl enable dnstt-service >/dev/null 2>&1
 
 echo "✅ DNSTT server started on TCP/UDP port $PORT1"
@@ -264,8 +292,8 @@ echo "✅ DNSTT server started on TCP/UDP port $PORT1"
 # Setup .profile
 # ------------------------------
 echo "⚙️ Configuring user profile..."
-cat > /root/.profile <<'END_PROFILE'
-if [ "$BASH" ]; then
+install_with_progress "Profile Setup" bash -c "cat > /root/.profile <<'END_PROFILE'
+if [ \"\$BASH\" ]; then
   if [ -f ~/.bashrc ]; then
     . ~/.bashrc
   fi
@@ -273,17 +301,14 @@ fi
 mesg n || true
 clear
 menu
-END_PROFILE
+END_PROFILE"
 chmod 644 /root/.profile
 
 # ------------------------------
 # Final Configuration
 # ------------------------------
 echo "📝 Finalizing configuration..."
-chmod 644 /etc/systemd/system/ws-stunnel.service
-chmod 644 /etc/systemd/system/ws-ovpn.service
-chmod 644 /etc/systemd/system/ws-dropbear.service
-chmod 644 /etc/systemd/system/xray.service
+install_with_progress "Setting Permissions" chmod 644 /etc/systemd/system/ws-stunnel.service /etc/systemd/system/ws-ovpn.service /etc/systemd/system/ws-dropbear.service /etc/systemd/system/xray.service
 
 # ------------------------------
 # Installation Summary
@@ -333,11 +358,18 @@ LOG="/root/log-install.txt"
 echo "Installation completed at: $(date)"
 echo "Domain: $SUB"
 echo "IP Address: $IP"
+echo "Services installed: SSH VPN, Xray, SSH Websocket, DNSTT"
 } > "$LOG"
 
-# Countdown before reboot
+# Countdown with visual bar
+echo "Reboot countdown:"
 for i in {10..1}; do
-    echo -ne "\rRebooting in $i seconds... "
+    filled=$((10 - i))
+    empty=$((i - 1))
+    printf "\r["
+    for ((j=0; j<filled; j++)); do printf "▰"; done
+    for ((j=0; j<empty; j++)); do printf "▱"; done
+    printf "] %2d seconds remaining" "$i"
     sleep 1
 done
 
