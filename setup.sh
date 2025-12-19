@@ -1,76 +1,32 @@
 #!/bin/bash
 
 # ------------------------------
-# Loading Bar Functions (Bar + Percentage)
+# Single Loading Bar Function
 # ------------------------------
-show_loading() {
-    local pid=$1
-    local msg=$2
-    local bar_length=30
-    local delay=0.1
-    local i=0
-    local spin_chars=('|' '/' '-' '\')
-    
-    echo -n "$msg...  "
-    
-    while kill -0 $pid 2>/dev/null; do
-        local pos=$((i % bar_length))
-        local filled=$(printf "%${pos}s" | tr ' ' '█')
-        local empty=$(printf "%$((bar_length - pos))s" | tr ' ' '░')
-        local percent=$((pos * 100 / bar_length))
-        local spin_char="${spin_chars[$((i % 4))]}"
-        
-        printf "\r[%s%s] %3d%% %s" "$filled" "$empty" "$percent" "$spin_char"
-        ((i++))
-        sleep $delay
-    done
-    
-    printf "\r[██████████████████████████████] 100%% ✓\n"
-}
+total_steps=16
+current_step=0
 
-progress_line() {
-    local msg=$1
-    local width=50
-    echo -n "$msg "
+update_progress() {
+    local step_name="$1"
+    current_step=$((current_step + 1))
+    local percentage=$((current_step * 100 / total_steps))
+    local bar_length=50
+    local filled=$((bar_length * current_step / total_steps))
+    local empty=$((bar_length - filled))
     
-    for ((i=0; i<=width; i++)); do
-        printf "["
-        for ((j=0; j<i; j++)); do
-            printf "▰"
-        done
-        for ((j=i; j<width; j++)); do
-            printf "▱"
-        done
-        printf "] %d%%\r" $((i * 2))
-        sleep 0.05
-    done
+    # Clear line and draw progress bar
+    printf "\r\033[K"  # Clear entire line
+    printf "┌──────────────────────────────────────────────────────────┐\n"
+    printf "│                🚀 INSTALLATION PROGRESS                  │\n"
+    printf "├──────────────────────────────────────────────────────────┤\n"
+    printf "│ "
+    for ((i=0; i<filled; i++)); do printf "█"; done
+    for ((i=0; i<empty; i++)); do printf "░"; done
+    printf " │ %3d%%\n" "$percentage"
+    printf "├──────────────────────────────────────────────────────────┤\n"
+    printf "│ %-50s │\n" "$step_name"
+    printf "└──────────────────────────────────────────────────────────┘\n"
     echo ""
-}
-
-install_with_progress() {
-    local msg=$1
-    shift
-    local command="$@"
-    
-    echo -ne "$msg... "
-    ($command >/dev/null 2>&1) &
-    local pid=$!
-    
-    local dots=0
-    while kill -0 $pid 2>/dev/null; do
-        case $dots in
-            0) echo -ne "|   \r";;
-            1) echo -ne "/   \r";;
-            2) echo -ne "-   \r";;
-            3) echo -ne "\\   \r";;
-        esac
-        dots=$(((dots + 1) % 4))
-        sleep 0.2
-    done
-    
-    wait $pid
-    echo -ne "✓      \r"
-    echo "$msg... Done!"
 }
 
 # ------------------------------
@@ -88,28 +44,21 @@ if [ "${EUID:-0}" -ne 0 ]; then
     exit 1
 fi
 
-echo ""
-echo "┌──────────────────────────────────────────────────────────┐"
-echo "│            🚀 STARTING INSTALLATION PROCESS              │"
-echo "└──────────────────────────────────────────────────────────┘"
-echo ""
+clear
+update_progress "Starting installation..."
 
 # ------------------------------
 # Initial setup
 # ------------------------------
-echo "📦 Updating system packages..."
-apt update -y >/dev/null 2>&1 &
-show_loading $! "System Update"
+update_progress "Updating system packages..."
+apt update -y >/dev/null 2>&1
 
-echo "📦 Installing dependencies..."
-apt install -y jq curl wget >/dev/null 2>&1 &
-show_loading $! "Dependencies"
+update_progress "Installing dependencies..."
+apt install -y jq curl wget >/dev/null 2>&1
 
-echo "📁 Creating directory structure..."
+update_progress "Creating directory structure..."
 mkdir -p /etc/xray /etc/v2ray /root/scripts /var/lib 2>/dev/null
 touch /etc/xray/domain /etc/v2ray/domain /etc/xray/scdomain /etc/v2ray/scdomain /root/scdomain
-progress_line "Directory Setup"
-echo "✅ Directory structure created"
 
 IP=$(curl -s ipv4.icanhazip.com)
 
@@ -117,6 +66,8 @@ IP=$(curl -s ipv4.icanhazip.com)
 # Domain Selection Menu
 # ------------------------------
 clear
+update_progress "Domain configuration..."
+
 echo ""
 echo "┌──────────────────────────────────────────────────────────┐"
 echo "│              🌐 DOMAIN CONFIGURATION MENU                │"
@@ -135,27 +86,22 @@ while true; do
     esac
 done
 
-echo ""
-echo "⏳ Configuring domain settings..."
 case "$dns" in
   1)
-    # Random A + NS
     SUB="ws-$(tr -dc a-z0-9 </dev/urandom | head -c5).$DOMAIN"
     NS_SUB="dns.$SUB"
     
-    echo "  📝 Creating A record: $SUB → $IP"
+    update_progress "Creating Cloudflare A record..."
     curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records" \
       -H "Authorization: Bearer $CF_TOKEN" \
       -H "Content-Type: application/json" \
-      --data "{\"type\":\"A\",\"name\":\"$SUB\",\"content\":\"$IP\",\"ttl\":120,\"proxied\":false}" >/dev/null &
-    show_loading $! "Creating A Record"
+      --data "{\"type\":\"A\",\"name\":\"$SUB\",\"content\":\"$IP\",\"ttl\":120,\"proxied\":false}" >/dev/null
     
-    echo "  📝 Creating NS record: $NS_SUB → $SUB"
+    update_progress "Creating Cloudflare NS record..."
     curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records" \
       -H "Authorization: Bearer $CF_TOKEN" \
       -H "Content-Type: application/json" \
-      --data "{\"type\":\"NS\",\"name\":\"$NS_SUB\",\"content\":\"$SUB\",\"ttl\":120}" >/dev/null &
-    show_loading $! "Creating NS Record"
+      --data "{\"type\":\"NS\",\"name\":\"$NS_SUB\",\"content\":\"$SUB\",\"ttl\":120}" >/dev/null
     
     echo "$SUB" | tee /root/scdomain /etc/xray/domain /etc/v2ray/domain /etc/xray/scdomain /var/lib/ipvps.conf >/dev/null
     echo "$NS_SUB" | tee /root/nsdomain >/dev/null
@@ -163,41 +109,38 @@ case "$dns" in
   2)
     SUB="ws-$(tr -dc a-z0-9 </dev/urandom | head -c5).$DOMAIN"
     
-    echo "  📝 Creating A record: $SUB → $IP"
+    update_progress "Creating Cloudflare A record..."
     curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records" \
       -H "Authorization: Bearer $CF_TOKEN" \
       -H "Content-Type: application/json" \
-      --data "{\"type\":\"A\",\"name\":\"$SUB\",\"content\":\"$IP\",\"ttl\":120,\"proxied\":false}" >/dev/null &
-    show_loading $! "Creating A Record"
+      --data "{\"type\":\"A\",\"name\":\"$SUB\",\"content\":\"$IP\",\"ttl\":120,\"proxied\":false}" >/dev/null
     
     echo "$SUB" | tee /root/scdomain /etc/xray/domain /etc/v2ray/domain >/dev/null
     ;;
   3)
     read -rp "Enter your domain (A only): " dom
-    echo ""
-    echo "⏳ Setting up domain: $dom"
-    progress_line "Domain Configuration"
-    echo "$dom" | tee /root/scdomain /etc/xray/domain /etc/v2ray/domain >/dev/null
     SUB="$dom"
+    update_progress "Configuring domain..."
+    echo "$dom" | tee /root/scdomain /etc/xray/domain /etc/v2ray/domain >/dev/null
     ;;
   4)
     read -rp "Enter your domain (A+NS): " dom
     SUB="$dom"
     NS_SUB="dns.$SUB"
     
-    echo ""
-    echo "⏳ Configuring domain: $dom"
-    echo "  📝 Creating NS record: $NS_SUB → $SUB"
+    update_progress "Creating Cloudflare NS record..."
     curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$ZONE/dns_records" \
       -H "Authorization: Bearer $CF_TOKEN" \
       -H "Content-Type: application/json" \
-      --data "{\"type\":\"NS\",\"name\":\"$NS_SUB\",\"content\":\"$SUB\",\"ttl\":120}" >/dev/null &
-    show_loading $! "Creating NS Record"
+      --data "{\"type\":\"NS\",\"name\":\"$NS_SUB\",\"content\":\"$SUB\",\"ttl\":120}" >/dev/null
     
     echo "$SUB" | tee /root/scdomain /etc/xray/domain /etc/v2ray/domain >/dev/null
     echo "$NS_SUB" | tee /root/nsdomain >/dev/null
     ;;
 esac
+
+clear
+update_progress "Domain setup complete!"
 
 echo ""
 echo "┌──────────────────────────────────────────────────────────┐"
@@ -208,58 +151,47 @@ echo "  A Record → $SUB → $IP"
 echo ""
 
 # ------------------------------
-# Install Services with Progress
+# Install Services
 # ------------------------------
-echo "🚀 Starting main installation process..."
-echo ""
-
-echo "📥 Downloading SSH VPN installer..."
-wget -q -O /root/ssh-vpn.sh "https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/ssh-vpn.sh" &
-show_loading $! "Download SSH VPN"
+update_progress "Downloading SSH VPN installer..."
+wget -q -O /root/ssh-vpn.sh "https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/ssh/ssh-vpn.sh"
 chmod +x /root/ssh-vpn.sh
 
-echo "🔄 Installing SSH VPN service..."
-bash /root/ssh-vpn.sh >/dev/null 2>&1 &
-show_loading $! "Install SSH VPN"
+update_progress "Installing SSH VPN service..."
+bash /root/ssh-vpn.sh >/dev/null 2>&1
 
-echo "📥 Downloading Xray installer..."
-wget -q -O /root/ins-xray.sh "https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/xray/ins-xray.sh" &
-show_loading $! "Download Xray"
+update_progress "Downloading Xray installer..."
+wget -q -O /root/ins-xray.sh "https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/master/xray/ins-xray.sh"
 chmod +x /root/ins-xray.sh
 
-echo "🔄 Installing Xray service..."
-bash /root/ins-xray.sh >/dev/null 2>&1 &
-show_loading $! "Install Xray"
+update_progress "Installing Xray service..."
+bash /root/ins-xray.sh >/dev/null 2>&1
 
-echo "📥 Downloading SSH Websocket installer..."
-wget -q -O /root/insshws.sh "https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/refs/heads/master/sshws/insshws.sh" &
-show_loading $! "Download SSH Websocket"
+update_progress "Downloading SSH Websocket installer..."
+wget -q -O /root/insshws.sh "https://raw.githubusercontent.com/Mahboub-power-is-back/multiws/refs/heads/master/sshws/insshws.sh"
 chmod +x /root/insshws.sh
 
-echo "🔄 Installing SSH Websocket..."
-bash /root/insshws.sh >/dev/null 2>&1 &
-show_loading $! "Install SSH Websocket"
+update_progress "Installing SSH Websocket..."
+bash /root/insshws.sh >/dev/null 2>&1
 
 # ------------------------------
 # Install DNSTT Service
 # ------------------------------
-echo ""
-echo "🌐 Configuring DNSTT Service..."
+update_progress "Configuring DNSTT Service..."
 if [ -f /root/nsdomain ]; then
     DnsNS=$(cat /root/nsdomain)
-    echo "  Using NS domain: $DnsNS"
 else
-    echo "  ⚠️ NS domain not found! Skipping DNSTT."
+    echo "⚠️ NS domain not found! Skipping DNSTT."
     DnsNS=""
 fi
 
 PORT1=443
-echo "📥 Downloading DNSTT server..."
-wget -q -c https://raw.githubusercontent.com/Mahboub-power-is-back/Myapp/refs/heads/main/dnstt-server -O /usr/local/bin/dnstt-server &
-show_loading $! "Download DNSTT Server"
+
+update_progress "Downloading DNSTT server..."
+wget -q -c https://raw.githubusercontent.com/Mahboub-power-is-back/Myapp/refs/heads/main/dnstt-server -O /usr/local/bin/dnstt-server
 chmod +x /usr/local/bin/dnstt-server
 
-echo "🔄 Configuring DNSTT service..."
+update_progress "Creating DNSTT service file..."
 cat <<EOF > /etc/systemd/system/dnstt-service.service
 [Unit]
 Description=DNSTT Server
@@ -280,20 +212,17 @@ RestartSec=3
 WantedBy=multi-user.target
 EOF
 
-echo "⚙️ Starting DNSTT service..."
+update_progress "Starting DNSTT service..."
 systemctl daemon-reload >/dev/null 2>&1
-systemctl start dnstt-service >/dev/null 2>&1 &
-show_loading $! "Start DNSTT Service"
+systemctl start dnstt-service >/dev/null 2>&1
 systemctl enable dnstt-service >/dev/null 2>&1
 
-echo "✅ DNSTT server started on TCP/UDP port $PORT1"
-
 # ------------------------------
-# Setup .profile
+# Final Configuration
 # ------------------------------
-echo "⚙️ Configuring user profile..."
-install_with_progress "Profile Setup" bash -c "cat > /root/.profile <<'END_PROFILE'
-if [ \"\$BASH\" ]; then
+update_progress "Setting up user profile..."
+cat > /root/.profile <<'END_PROFILE'
+if [ "$BASH" ]; then
   if [ -f ~/.bashrc ]; then
     . ~/.bashrc
   fi
@@ -301,20 +230,32 @@ fi
 mesg n || true
 clear
 menu
-END_PROFILE"
+END_PROFILE
 chmod 644 /root/.profile
 
-# ------------------------------
-# Final Configuration
-# ------------------------------
-echo "📝 Finalizing configuration..."
-install_with_progress "Setting Permissions" chmod 644 /etc/systemd/system/ws-stunnel.service /etc/systemd/system/ws-ovpn.service /etc/systemd/system/ws-dropbear.service /etc/systemd/system/xray.service
+update_progress "Setting file permissions..."
+chmod 644 /etc/systemd/system/ws-stunnel.service
+chmod 644 /etc/systemd/system/ws-ovpn.service
+chmod 644 /etc/systemd/system/ws-dropbear.service
+chmod 644 /etc/systemd/system/xray.service
 
 # ------------------------------
 # Installation Summary
 # ------------------------------
 clear
+update_progress "Installation complete! Preparing summary..."
+
+# Final 100% display
+printf "\r\033[K"  # Clear entire line
+printf "┌──────────────────────────────────────────────────────────┐\n"
+printf "│                🚀 INSTALLATION PROGRESS                  │\n"
+printf "├──────────────────────────────────────────────────────────┤\n"
+printf "│ ████████████████████████████████████████████████████████ │ 100%%\n"
+printf "├──────────────────────────────────────────────────────────┤\n"
+printf "│ ✅ Installation Complete! Ready to reboot.               │\n"
+printf "└──────────────────────────────────────────────────────────┘\n"
 echo ""
+
 echo "┌───────────────────────────────────────────────────────────────┐"
 echo "│                     🎉 INSTALLATION COMPLETE                  │"
 echo "├───────────────────────────────────────────────────────────────┤"
@@ -325,7 +266,7 @@ echo "│  • OpenVPN                  : 1194                            │"
 echo "│  • SSH Websocket            : 80                              │"
 echo "│  • SSH SSL Websocket        : 443                             │"
 echo "│  • OVPN Websocket           : 80                              │"
-echo "│  • OVPN SSL Websocket       : 443                             │"
+echo "│  • OVPN SSL Websocket       : 443                             │
 echo "│  • Stunnel4                 : 222, 777                        │"
 echo "│  • Dropbear                 : 109, 143                        │"
 echo "│  • UDP CUSTOM               : 1-65535                         │"
